@@ -301,6 +301,40 @@ canvas#confetti { position: fixed; top: 0; left: 0; width: 100%; height: 100%; p
 .hist-medal { font-size: 14px; width: 20px; }
 .hist-pname { flex:1; font-weight: 700; }
 .hist-ppts { color: var(--green-dark); font-weight: 700; }
+
+/* ── Map tab ── */
+.map-filter-row {
+  display: flex; gap: 6px; flex-wrap: wrap;
+  padding: 10px 0 10px;
+}
+.map-chip {
+  background: var(--card); border: 1.5px solid var(--border);
+  border-radius: 999px; padding: 5px 14px;
+  font-size: 13px; font-weight: 700; font-family: 'Nunito', sans-serif;
+  color: var(--muted); cursor: pointer; white-space: nowrap;
+  transition: all 0.15s;
+}
+.map-chip.active { background: var(--text); color: white; border-color: var(--text); }
+.map-legend {
+  display: flex; align-items: center; gap: 14px;
+  padding: 4px 0 12px; font-size: 12px; color: var(--muted); font-weight: 700; flex-wrap: wrap;
+}
+.map-legend-item { display: flex; align-items: center; gap: 5px; }
+.map-legend-dot { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+.ref-panel-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 6px; }
+.ref-panel { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 4px; }
+.ref-cell {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  width: 52px; padding: 6px 4px 5px;
+  border-radius: var(--radius-sm); border: 1.5px solid var(--border);
+  background: var(--card);
+}
+.ref-cell.is-new  { background: #FEF3E2; border-color: #E8A020; }
+.ref-cell.is-old  { background: #E6EEF7; border-color: #1B4F8A; }
+.ref-abbr { font-family: 'Fredoka One', cursive; font-size: 14px; color: var(--muted); }
+.ref-cell.is-new .ref-abbr { color: #7A4A00; }
+.ref-cell.is-old .ref-abbr { color: #1B4F8A; }
+.ref-pts { font-size: 9px; font-weight: 700; color: var(--muted); margin-top: 1px; }
 </style>
 </head>
 <body>
@@ -361,11 +395,21 @@ canvas#confetti { position: fixed; top: 0; left: 0; width: 100%; height: 100%; p
 <div class="content">
 
   <div class="panel active" id="tab-map">
-    <div id="us-map-wrap" style="width:100%;margin-bottom:8px;"></div>
-    <div style="display:flex;align-items:center;gap:16px;padding:4px 0 12px;font-size:12px;color:var(--muted);font-weight:700;">
-      <span style="display:flex;align-items:center;gap:5px;"><span id="map-legend-spotted" style="width:12px;height:12px;border-radius:3px;background:#1B4F8A;display:inline-block;"></span> Spotted</span>
-      <span style="display:flex;align-items:center;gap:5px;"><span style="width:12px;height:12px;border-radius:3px;background:#D6D3CB;display:inline-block;"></span> Not yet</span>
+    <div class="map-filter-row" id="map-filter-row">
+      <button class="map-chip active" data-player="__family__">Family</button>
     </div>
+    <div id="us-map-wrap" style="width:100%;margin-bottom:8px;"></div>
+    <div class="map-legend">
+      <span class="map-legend-item"><span class="map-legend-dot" style="background:#1B4F8A;"></span> Spotted</span>
+      <span class="map-legend-item"><span class="map-legend-dot" style="background:#E8A020;"></span> New (24h)</span>
+      <span class="map-legend-item"><span class="map-legend-dot" style="background:#D6D3CB;"></span> Not yet</span>
+    </div>
+    <div class="ref-panel-label">Northeast &amp; Small States</div>
+    <div class="ref-panel" id="ne-panel"></div>
+    <div class="ref-panel-label" style="margin-top:10px;">Canadian Provinces &amp; Territories</div>
+    <div class="ref-panel" id="ca-panel"></div>
+    <div class="ref-panel-label" style="margin-top:10px;">Other</div>
+    <div class="ref-panel" id="other-panel"></div>
   </div>
 
   <div class="panel" id="tab-spot">
@@ -536,132 +580,161 @@ function startCountdown(deadlineTs) {
 }
 
 
+// ── Map filter state (local UI only, no Firebase) ──
+let mapFilterPlayer = '__family__';
+
+function getSpotStatus(abbr) {
+  // Returns 'none' | 'new' (< 24h) | 'old' (>= 24h) based on current filter
+  const spotted = gameState.spotted || {};
+  if (mapFilterPlayer === '__family__') {
+    const entry = spotted[abbr];
+    if (!entry) return 'none';
+    const age = Date.now() - (entry.ts || 0);
+    return age < 86400000 ? 'new' : 'old';
+  } else {
+    // Player view: check if this player has spotted it
+    const player = Object.values(gameState.players).find(p => p.name === mapFilterPlayer);
+    if (!player || !player.spotted || !player.spotted[abbr]) return 'none';
+    // Use family timestamp for the 24h window
+    const familyEntry = spotted[abbr];
+    const age = familyEntry ? Date.now() - (familyEntry.ts || 0) : Infinity;
+    return age < 86400000 ? 'new' : 'old';
+  }
+}
+
+function mapFill(status)     { return status === 'new' ? '#E8A020' : status === 'old' ? '#1B4F8A' : '#D6D3CB'; }
+function mapTextCol(status)  { return status !== 'none' ? '#FFFFFF' : '#9A9890'; }
+
+function renderMapChips() {
+  const row = document.getElementById('map-filter-row');
+  if (!row) return;
+  row.innerHTML = '';
+  const make = (label, player) => {
+    const btn = document.createElement('button');
+    btn.className = 'map-chip' + (mapFilterPlayer === player ? ' active' : '');
+    btn.textContent = label;
+    btn.onclick = () => { mapFilterPlayer = player; renderMap(); };
+    row.appendChild(btn);
+  };
+  make('Family', '__family__');
+  Object.values(gameState.players).forEach(p => make(p.name, p.name));
+}
+
 function renderMap() {
+  renderMapChips();
   const wrap = document.getElementById('us-map-wrap');
   if (!wrap) return;
-  const spotted = gameState.spotted || {};
 
-  // Well-known simplified US state paths, viewBox 980x600
-  const states = {
-    WA:"M 120,60 L 205,48 L 212,70 L 220,90 L 185,96 L 155,100 L 120,95 Z",
-    OR:"M 118,96 L 155,100 L 185,96 L 220,90 L 228,160 L 118,172 Z",
-    CA:"M 118,172 L 155,158 L 175,190 L 185,260 L 178,330 L 155,370 L 118,348 L 100,280 Z",
-    ID:"M 220,90 L 265,80 L 278,100 L 290,165 L 255,175 L 228,160 Z",
-    NV:"M 155,158 L 228,160 L 240,240 L 220,330 L 175,320 L 155,260 Z",
-    UT:"M 228,160 L 290,155 L 300,250 L 240,255 L 240,240 Z",
-    AZ:"M 175,320 L 220,330 L 300,325 L 300,420 L 175,420 Z",
-    MT:"M 220,48 L 370,32 L 378,125 L 290,130 L 265,80 Z",
-    WY:"M 265,80 L 378,72 L 385,165 L 290,165 Z",
-    CO:"M 290,165 L 385,160 L 390,250 L 295,255 Z",
-    NM:"M 290,255 L 390,250 L 392,355 L 295,358 L 292,330 Z",
-    ND:"M 375,32 L 500,22 L 505,110 L 380,118 Z",
-    SD:"M 378,118 L 503,108 L 508,195 L 382,200 Z",
-    NE:"M 380,200 L 506,192 L 510,262 L 383,268 Z",
-    KS:"M 382,268 L 508,260 L 512,335 L 384,340 Z",
-    OK:"M 382,340 L 512,332 L 516,385 L 432,388 L 430,405 L 382,405 Z",
-    TX:"M 382,405 L 430,405 L 432,388 L 516,385 L 520,490 L 440,510 L 382,475 Z",
-    MN:"M 500,22 L 570,18 L 580,85 L 560,120 L 508,118 L 503,108 Z",
-    IA:"M 505,118 L 558,115 L 565,192 L 508,198 Z",
-    MO:"M 506,195 L 564,190 L 570,290 L 508,294 L 505,270 Z",
-    AR:"M 506,294 L 568,288 L 572,358 L 508,362 Z",
-    LA:"M 506,362 L 570,356 L 572,415 L 535,430 L 506,415 Z",
-    WI:"M 558,68 L 608,60 L 618,130 L 600,150 L 565,148 L 560,120 Z",
-    IL:"M 558,148 L 598,145 L 605,255 L 562,260 L 558,225 Z",
-    MI:"M 598,60 L 648,55 L 660,100 L 638,118 L 610,125 L 600,145 Z",
-    IN:"M 598,148 L 638,145 L 642,230 L 600,235 Z",
-    OH:"M 638,118 L 685,112 L 692,210 L 640,215 L 638,148 Z",
-    KY:"M 600,235 L 690,215 L 696,270 L 600,278 Z",
-    TN:"M 560,295 L 696,272 L 700,312 L 562,318 Z",
-    MS:"M 560,318 L 608,315 L 612,390 L 565,395 Z",
-    AL:"M 608,318 L 648,315 L 652,405 L 608,408 Z",
-    GA:"M 648,278 L 695,272 L 700,375 L 648,378 Z",
-    FL:"M 648,378 L 700,372 L 715,420 L 695,465 L 660,450 L 640,415 Z",
-    SC:"M 695,272 L 740,262 L 748,315 L 698,318 Z",
-    NC:"M 695,240 L 762,225 L 768,268 L 698,275 Z",
-    VA:"M 690,210 L 762,195 L 768,238 L 695,245 Z",
-    WV:"M 655,190 L 695,182 L 698,218 L 660,222 Z",
-    PA:"M 638,155 L 758,140 L 762,185 L 640,198 Z",
-    NY:"M 638,110 L 762,95 L 765,148 L 640,158 Z",
-    MD:"M 695,182 L 758,170 L 762,195 L 698,205 Z",
-    DE:"M 762,170 L 782,168 L 784,195 L 762,197 Z",
-    NJ:"M 762,148 L 788,145 L 790,182 L 764,185 Z",
-    CT:"M 788,128 L 812,125 L 814,148 L 788,150 Z",
-    RI:"M 812,122 L 828,120 L 830,140 L 812,142 Z",
-    MA:"M 762,100 L 835,92 L 838,122 L 762,128 Z",
-    VT:"M 762,72 L 782,68 L 785,102 L 762,105 Z",
-    NH:"M 782,65 L 800,60 L 804,100 L 784,103 Z",
-    ME:"M 800,40 L 840,32 L 850,85 L 804,92 Z"
+  // Accurate simplified state paths, viewBox 0 0 960 620
+  const PATHS = {
+    WA:'M 117,35 L 200,22 L 215,45 L 225,72 L 190,80 L 160,86 L 117,82 Z',
+    OR:'M 115,84 L 160,86 L 190,80 L 225,72 L 235,155 L 115,170 Z',
+    CA:'M 113,170 L 165,162 L 182,210 L 192,278 L 180,348 L 155,392 L 113,368 L 93,300 L 98,230 Z',
+    ID:'M 225,72 L 272,62 L 288,90 L 295,175 L 258,182 L 235,155 Z',
+    NV:'M 160,162 L 235,155 L 258,182 L 248,268 L 222,348 L 178,338 L 162,278 Z',
+    UT:'M 235,155 L 295,150 L 308,258 L 248,265 Z',
+    AZ:'M 178,338 L 222,348 L 308,342 L 310,435 L 178,432 Z',
+    MT:'M 225,28 L 382,14 L 390,110 L 295,118 L 272,62 Z',
+    WY:'M 272,62 L 390,52 L 400,160 L 295,165 Z',
+    CO:'M 295,165 L 400,158 L 408,258 L 308,262 Z',
+    NM:'M 308,262 L 408,256 L 415,362 L 308,364 Z',
+    ND:'M 382,14 L 514,6 L 518,105 L 390,108 Z',
+    SD:'M 390,108 L 518,103 L 522,198 L 392,200 Z',
+    NE:'M 392,200 L 520,196 L 524,272 L 394,274 Z',
+    KS:'M 394,274 L 522,270 L 526,348 L 396,350 Z',
+    OK:'M 396,350 L 526,346 L 528,400 L 434,402 L 434,418 L 396,418 Z',
+    TX:'M 396,418 L 434,418 L 434,402 L 528,398 L 534,508 L 448,530 L 396,492 Z',
+    MN:'M 514,6 L 582,2 L 592,80 L 566,118 L 520,118 Z',
+    IA:'M 518,118 L 568,114 L 576,198 L 520,200 Z',
+    MO:'M 520,200 L 574,196 L 582,300 L 520,304 L 518,278 Z',
+    AR:'M 520,304 L 580,298 L 584,370 L 520,372 Z',
+    LA:'M 520,372 L 582,366 L 584,428 L 548,444 L 520,428 Z',
+    WI:'M 566,62 L 618,54 L 630,130 L 608,152 L 572,148 L 568,118 Z',
+    IL:'M 568,150 L 606,148 L 618,264 L 572,268 L 568,228 Z',
+    MI:'M 606,54 L 658,48 L 672,100 L 646,122 L 614,128 L 608,152 Z',
+    IN:'M 606,150 L 646,146 L 652,240 L 608,244 Z',
+    OH:'M 646,122 L 696,116 L 704,218 L 648,222 Z',
+    KY:'M 608,244 L 704,218 L 710,278 L 608,282 Z',
+    TN:'M 570,302 L 708,278 L 714,318 L 572,322 Z',
+    MS:'M 572,322 L 618,320 L 622,400 L 574,404 Z',
+    AL:'M 618,322 L 658,320 L 662,416 L 620,418 Z',
+    GA:'M 658,282 L 706,278 L 712,386 L 658,388 Z',
+    FL:'M 656,388 L 712,382 L 728,434 L 708,476 L 672,462 L 648,420 Z',
+    SC:'M 706,278 L 752,268 L 758,322 L 708,326 Z',
+    NC:'M 704,240 L 774,226 L 780,272 L 706,278 Z',
+    VA:'M 698,214 L 774,198 L 778,240 L 700,248 Z',
+    PA:'M 644,158 L 770,142 L 774,192 L 646,202 Z',
+    NY:'M 644,114 L 770,98 L 774,146 L 680,158 L 648,158 Z',
+    WV:'M 660,200 L 700,190 L 706,224 L 664,230 Z',
+    MD:'M 700,190 L 764,178 L 768,200 L 702,208 Z',
+    DE:'M 766,176 L 786,173 L 788,200 L 766,202 Z',
+    NJ:'M 766,148 L 790,145 L 792,182 L 768,184 Z',
+    CT:'M 790,130 L 814,127 L 816,150 L 790,152 Z',
+    RI:'M 814,124 L 830,122 L 832,142 L 814,144 Z',
+    MA:'M 764,102 L 836,94 L 838,126 L 764,130 Z',
+    VT:'M 764,74 L 784,70 L 786,104 L 764,106 Z',
+    NH:'M 784,67 L 802,62 L 806,102 L 786,105 Z',
+    ME:'M 802,40 L 842,30 L 852,86 L 806,94 Z'
   };
 
-  const stateLabels = {
-    WA:{x:165,y:78},OR:{x:170,y:135},CA:{x:138,y:265},ID:{x:252,y:130},
-    NV:{x:192,y:245},UT:{x:262,y:205},AZ:{x:238,y:372},MT:{x:298,y:80},
-    WY:{x:325,y:122},CO:{x:338,y:208},NM:{x:340,y:305},ND:{x:438,y:72},
-    SD:{x:442,y:155},NE:{x:444,y:232},KS:{x:446,y:302},OK:{x:446,y:368},
-    TX:{x:448,y:448},MN:{x:535,y:72},IA:{x:534,y:158},MO:{x:535,y:242},
-    AR:{x:536,y:325},LA:{x:534,y:392},WI:{x:582,y:108},IL:{x:580,y:202},
-    MI:{x:628,y:92},IN:{x:618,y:190},OH:{x:662,y:162},KY:{x:646,y:252},
-    TN:{x:628,y:305},MS:{x:582,y:355},AL:{x:628,y:362},GA:{x:672,y:325},
-    FL:{x:672,y:420},SC:{x:718,y:292},NC:{x:728,y:250},VA:{x:725,y:222},
-    WV:{x:675,y:205},PA:{x:698,y:172},NY:{x:698,y:130},MD:{x:726,y:190},
-    DE:{x:772,y:183},NJ:{x:775,y:165},CT:{x:800,y:138},RI:{x:820,y:130},
-    MA:{x:798,y:110},VT:{x:772,y:88},NH:{x:792,y:82},ME:{x:822,y:62}
+  // Label positions for main map states
+  const LABELS = {
+    WA:{x:168,y:57},OR:{x:173,y:128},CA:{x:140,y:280},ID:{x:258,y:130},
+    NV:{x:200,y:260},UT:{x:270,y:208},AZ:{x:242,y:390},MT:{x:308,y:66},
+    WY:{x:336,y:112},CO:{x:352,y:212},NM:{x:360,y:316},ND:{x:448,y:58},
+    SD:{x:454,y:152},NE:{x:458,y:238},KS:{x:460,y:312},OK:{x:462,y:378},
+    TX:{x:462,y:468},MN:{x:548,y:62},IA:{x:546,y:158},MO:{x:549,y:252},
+    AR:{x:550,y:336},LA:{x:550,y:408},WI:{x:596,y:104},IL:{x:591,y:208},
+    MI:{x:634,y:90},IN:{x:628,y:194},OH:{x:674,y:170},KY:{x:658,y:252},
+    TN:{x:640,y:302},MS:{x:596,y:362},AL:{x:638,y:370},GA:{x:682,y:334},
+    FL:{x:680,y:430},SC:{x:730,y:298},NC:{x:738,y:254},VA:{x:735,y:226},
+    PA:{x:708,y:175},NY:{x:708,y:132},ME:{x:826,y:62}
   };
 
-  const tinyStates = new Set(['CT','DE','MD','MA','NH','NJ','RI','VT','WV','DC']);
+  // These go to reference panels only
+  const REF_ONLY = new Set(['CT','DE','MA','MD','NJ','NH','RI','VT','WV','AK','HI','DC','US','AB','BC','MB','NB','NL','NS','ON','PE','QC','SK']);
 
-  let svg = '<svg viewBox="95 18 760 500" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block;">';
+  let svg = `<svg viewBox="88 0 780 510" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block;">`;
+  svg += `<defs><filter id="dropshadow"><feDropShadow dx="0" dy="1" stdDeviation="1" flood-color="rgba(0,0,0,0.14)"/></filter></defs>`;
 
-  // Drop shadow filter
-  svg += '<defs><filter id="sh" x="-5%" y="-5%" width="110%" height="110%"><feDropShadow dx="0" dy="1" stdDeviation="1" flood-color="rgba(0,0,0,0.18)"/></filter></defs>';
-
-  Object.entries(states).forEach(([abbr, path]) => {
-    const isSpotted = !!spotted[abbr];
-    const fill = isSpotted ? '#1B4F8A' : '#D6D3CB';
-    const stroke = '#FFFFFF';
-    const textColor = isSpotted ? '#FFFFFF' : '#7A7873';
-    svg += '<path d="' + path + '" fill="' + fill + '" stroke="' + stroke + '" stroke-width="1.2" filter="url(#sh)"/>';
-    if (stateLabels[abbr] && !tinyStates.has(abbr)) {
-      svg += '<text x="' + stateLabels[abbr].x + '" y="' + (stateLabels[abbr].y+4) + '" text-anchor="middle" font-family="Fredoka One,cursive" font-size="9.5" fill="' + textColor + '">' + abbr + '</text>';
+  Object.entries(PATHS).forEach(([abbr, path]) => {
+    if (REF_ONLY.has(abbr)) return;
+    const status = getSpotStatus(abbr);
+    svg += `<path d="${path}" fill="${mapFill(status)}" stroke="#FFF" stroke-width="1.2" stroke-linejoin="round" filter="url(#dropshadow)"/>`;
+    if (LABELS[abbr]) {
+      svg += `<text x="${LABELS[abbr].x}" y="${LABELS[abbr].y + 4}" text-anchor="middle" font-family="Fredoka One,cursive" font-size="10" fill="${mapTextCol(status)}" pointer-events="none">${abbr}</text>`;
     }
   });
 
-  // Legend line for tiny NE states (no room for labels)
-  svg += '<text x="858" y="130" font-family="Nunito,sans-serif" font-size="8" fill="#AAA8A3">NE states</text>';
-  const tiny = ['CT','RI','DE','NJ','MD','VT','NH','WV','MA'];
-  tiny.forEach((abbr,i) => {
-    const isSpotted = !!spotted[abbr];
-    const fill = isSpotted ? '#1B4F8A' : '#D6D3CB';
-    svg += '<rect x="858" y="' + (135+i*14) + '" width="10" height="10" rx="2" fill="' + fill + '" stroke="#fff" stroke-width="0.8"/>';
-    svg += '<text x="872" y="' + (144+i*14) + '" font-family="Nunito,sans-serif" font-size="9" fill="#444">' + abbr + '</text>';
-  });
-
-  // AK, HI, Canadian provinces as small boxes at bottom
-  const extras = [
-    {abbr:'AK',name:'Alaska'},{abbr:'HI',name:'Hawaii'},{abbr:'DC',name:'DC'},
-    {abbr:'US',name:'US Gov'},
-    {abbr:'AB',name:'AB'},{abbr:'BC',name:'BC'},{abbr:'MB',name:'MB'},
-    {abbr:'NB',name:'NB'},{abbr:'NL',name:'NL'},{abbr:'NS',name:'NS'},
-    {abbr:'ON',name:'ON'},{abbr:'PE',name:'PE'},{abbr:'QC',name:'QC'},{abbr:'SK',name:'SK'}
-  ];
-
-  svg += '<text x="98" y="533" font-family="Nunito,sans-serif" font-size="8" fill="#AAA8A3" font-weight="700">AK · HI · DC · US Gov · Canadian Provinces</text>';
-  let bx = 98;
-  extras.forEach(e => {
-    const isSpotted = !!spotted[e.abbr];
-    const fill = isSpotted ? '#1B4F8A' : '#D6D3CB';
-    const tc = isSpotted ? '#FFFFFF' : '#555';
-    svg += '<rect x="' + bx + '" y="538" width="46" height="22" rx="4" fill="' + fill + '" stroke="#fff" stroke-width="1"/>';
-    svg += '<text x="' + (bx+23) + '" y="553" text-anchor="middle" font-family="Fredoka One,cursive" font-size="9" fill="' + tc + '">' + e.abbr + '</text>';
-    bx += 52;
-  });
-
-  svg += '</svg>';
+  svg += `</svg>`;
   wrap.innerHTML = svg;
 
-  // Update map legend colors
-  const mapLegend = document.getElementById('map-legend-spotted');
-  if (mapLegend) mapLegend.style.background = '#1B4F8A';
+  // Reference panels
+  renderRefPanel('ne-panel',    ['CT','DE','MA','MD','NJ','NH','RI','VT','WV']);
+  renderRefPanel('ca-panel',    ['AB','BC','MB','NB','NL','NS','ON','PE','QC','SK']);
+  renderRefPanel('other-panel', ['AK','HI','DC','US']);
+}
+
+function renderRefPanel(id, abbrs) {
+  const panel = document.getElementById(id);
+  if (!panel) return;
+  panel.innerHTML = '';
+  const NAMES = {
+    CT:'Connecticut', DE:'Delaware', MA:'Massachusetts', MD:'Maryland',
+    NJ:'New Jersey', NH:'New Hampshire', RI:'Rhode Island', VT:'Vermont', WV:'West Virginia',
+    AB:'Alberta', BC:'Brit. Columbia', MB:'Manitoba', NB:'New Brunswick',
+    NL:'Newfoundland', NS:'Nova Scotia', ON:'Ontario', PE:'PEI', QC:'Quebec', SK:'Saskatchewan',
+    AK:'Alaska', HI:'Hawaii', DC:'Washington DC', US:'US Government'
+  };
+  abbrs.forEach(abbr => {
+    const status = getSpotStatus(abbr);
+    const pts = status !== 'none' ? platePoints(abbr) : null;
+    const cell = document.createElement('div');
+    cell.className = 'ref-cell' + (status === 'new' ? ' is-new' : status === 'old' ? ' is-old' : '');
+    cell.title = NAMES[abbr] || abbr;
+    cell.innerHTML = `<span class="ref-abbr">${abbr}</span>` + (pts !== null ? `<span class="ref-pts">${pts} pts</span>` : '');
+    panel.appendChild(cell);
+  });
 }
 
 
@@ -1000,7 +1073,7 @@ async function logSpot(spotter, abbr, loc, notes) {
   updates['game/players/' + playerKey + '/points'] = newPoints;
   updates['game/players/' + playerKey + '/spotCount'] = newSpotCount;
   updates['game/players/' + playerKey + '/spotted/' + abbr] = new Date().toLocaleDateString();
-  if (familyFirstSpot) updates['game/spotted/' + abbr] = { spotter, date: new Date().toLocaleDateString() };
+  if (familyFirstSpot) updates['game/spotted/' + abbr] = { spotter, date: new Date().toLocaleDateString(), ts: Date.now() };
   updates['game/log/' + logKey] = { abbr, spotter, loc: loc||'', notes: notes||'', pts, basePts, firstBonus, firstSpot: familyFirstSpot, date: new Date().toLocaleDateString(), ts: Date.now() };
   const { update } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js");
   await update(ref(db), updates);
