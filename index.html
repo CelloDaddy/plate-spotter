@@ -149,7 +149,7 @@ select:focus, input:focus { outline: none; border-color: var(--green); }
 }
 @media (min-width: 480px) { .plates-grid { grid-template-columns: repeat(6, 1fr); } }
 .plate-cell {
-  border: 1.5px solid var(--border);
+  border: 2.5px solid var(--border);
   border-radius: var(--radius-sm);
   padding: 8px 4px 6px;
   text-align: center;
@@ -340,9 +340,83 @@ canvas#confetti { position: fixed; top: 0; left: 0; width: 100%; height: 100%; p
 <body>
 
 <div class="loading-screen" id="loading">
-  <div class="loading-title">🚗 Plate Spotter</div>
-  <div class="loading-sub">Connecting to family game…</div>
-  <div class="loading-dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+  <style>
+    .plate-scene {
+      width: 220px; height: 160px;
+      perspective: 600px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .plate-wrap {
+      width: 200px; height: 110px;
+      position: relative;
+      transform-style: preserve-3d;
+      animation: plateSpin 2.4s ease-in-out infinite;
+      transform-origin: center center;
+    }
+    @keyframes plateSpin {
+      0%   { transform: rotateY(-90deg) rotateX(18deg) scale(0.6); }
+      18%  { transform: rotateY(0deg)   rotateX(18deg) scale(1);   }
+      45%  { transform: rotateY(0deg)   rotateX(18deg) scale(1);   }
+      80%  { transform: rotateY(90deg)  rotateX(18deg) scale(0.6); }
+      80.01%{ transform: rotateY(-90deg) rotateX(18deg) scale(0.6); }
+      100% { transform: rotateY(-90deg) rotateX(18deg) scale(0.6); }
+    }
+    .plate-svg { width: 200px; height: 110px; display: block; filter: drop-shadow(0 8px 24px rgba(0,0,0,0.45)); }
+    .loading-caption {
+      font-family: 'Fredoka One', cursive;
+      font-size: 15px;
+      color: rgba(255,255,255,0.5);
+      margin-top: 28px;
+      letter-spacing: 0.5px;
+    }
+  </style>
+  <div class="plate-scene">
+    <div class="plate-wrap">
+      <svg class="plate-svg" viewBox="0 0 200 110" xmlns="http://www.w3.org/2000/svg">
+        <!-- Plate base -->
+        <rect x="4" y="4" width="192" height="102" rx="14" ry="14" fill="#FFFFFF" stroke="#B0AEAA" stroke-width="1.5"/>
+        <!-- Coloured border band -->
+        <rect x="8" y="8" width="184" height="94" rx="11" ry="11" fill="none" stroke="#1D5CA8" stroke-width="5"/>
+        <!-- Top state label -->
+        <text x="100" y="24" text-anchor="middle" font-family="Fredoka One, cursive" font-size="10" fill="#1D5CA8" letter-spacing="2">ILLINOIS</text>
+        <!-- Main registration area -->
+        <!-- P on left side -->
+        <text x="32" y="72" text-anchor="middle" font-family="Fredoka One, cursive" font-size="36" fill="#1D5CA8" letter-spacing="-1">P</text>
+        <!-- Bison on right side (cartoon Wildlife Prairie Park style) -->
+        <!-- Body -->
+        <ellipse cx="155" cy="66" rx="20" ry="13" fill="#5C4A2A"/>
+        <!-- Hump -->
+        <ellipse cx="143" cy="56" rx="11" ry="9" fill="#5C4A2A"/>
+        <!-- Head -->
+        <circle cx="132" cy="58" r="8" fill="#5C4A2A"/>
+        <!-- Snout -->
+        <ellipse cx="126" cy="62" rx="5" ry="4" fill="#6B5535"/>
+        <!-- Eye -->
+        <circle cx="130" cy="55" r="1.5" fill="#FFF"/>
+        <circle cx="130" cy="55" r="0.8" fill="#1C1C1A"/>
+        <!-- Horn -->
+        <path d="M 132 51 Q 128 44 124 46" stroke="#7A6040" stroke-width="2" fill="none" stroke-linecap="round"/>
+        <!-- Front legs -->
+        <rect x="138" y="77" width="5" height="14" rx="2" fill="#5C4A2A"/>
+        <rect x="147" y="77" width="5" height="14" rx="2" fill="#5C4A2A"/>
+        <!-- Back legs -->
+        <rect x="158" y="77" width="5" height="14" rx="2" fill="#5C4A2A"/>
+        <rect x="167" y="77" width="5" height="14" rx="2" fill="#5C4A2A"/>
+        <!-- Tail -->
+        <path d="M 175 63 Q 182 58 179 54" stroke="#5C4A2A" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+        <!-- Grass tuft under bison -->
+        <path d="M 136 91 Q 138 86 140 91" stroke="#2E7D32" stroke-width="1.5" fill="none"/>
+        <path d="M 141 91 Q 143 85 145 91" stroke="#2E7D32" stroke-width="1.5" fill="none"/>
+        <path d="M 159 91 Q 161 86 163 91" stroke="#2E7D32" stroke-width="1.5" fill="none"/>
+        <!-- Bottom tagline -->
+        <text x="100" y="101" text-anchor="middle" font-family="Fredoka One, cursive" font-size="7.5" fill="#1D5CA8" letter-spacing="1.2">WILDLIFE PRAIRIE PARK</text>
+        <!-- Bolt holes -->
+        <circle cx="20" cy="55" r="4" fill="#E0DDD6" stroke="#B0AEAA" stroke-width="1"/>
+        <circle cx="180" cy="55" r="4" fill="#E0DDD6" stroke="#B0AEAA" stroke-width="1"/>
+      </svg>
+    </div>
+  </div>
+  <div class="loading-caption">Connecting to family game…</div>
 </div>
 
 <canvas id="confetti"></canvas>
@@ -385,8 +459,8 @@ canvas#confetti { position: fixed; top: 0; left: 0; width: 100%; height: 100%; p
 
 <div class="tabs">
   <button class="tab active" data-tab="map">Map</button>
-  <button class="tab" data-tab="spot">Spot a Plate</button>
   <button class="tab" data-tab="plates">All Plates</button>
+  <button class="tab" data-tab="spot">Spot a Plate</button>
   <button class="tab" data-tab="scores">Scores</button>
   <button class="tab" data-tab="log">Log</button>
   <button class="tab" data-tab="players">Players</button>
@@ -569,7 +643,7 @@ function startCountdown(deadlineTs) {
     const hrs = Math.floor((diff % 86400000) / 3600000);
     const mins = Math.floor((diff % 3600000) / 60000);
     const secs = Math.floor((diff % 60000) / 1000);
-    let label = 'Game ends in ';
+    let label = 'New game starts in: ';
     if (days > 0) label += days + 'd ' + hrs + 'h ' + mins + 'm';
     else if (hrs > 0) label += hrs + 'h ' + mins + 'm ' + secs + 's';
     else label += mins + 'm ' + secs + 's';
@@ -945,13 +1019,19 @@ function renderLeaderboard() {
     lb.innerHTML = '<div class="empty-state"><div class="empty-icon">🏆</div><p>No players yet.<br>Add some in the Players tab!</p></div>';
     return;
   }
-  const ranks = ['r1','r2','r3'];
   const medals = ['🥇','🥈','🥉'];
+  const ranks = ['r1','r2','r3'];
   lb.innerHTML = '';
-  players.forEach((p,i) => {
+
+  // Top 5 — normal ranked rows
+  const top5 = players.slice(0, 5);
+  top5.forEach((p, i) => {
     const row = document.createElement('div');
     row.className = 'lb-row';
-    row.innerHTML = '<span class="lb-rank ' + (ranks[i]||'') + '">' + (medals[i]||i+1) + '</span>'
+    const rankHtml = i < 3
+      ? '<span class="lb-rank ' + ranks[i] + '">' + medals[i] + '</span>'
+      : '<span class="lb-rank">' + (i + 1) + '</span>';
+    row.innerHTML = rankHtml
       + '<span class="lb-name">' + p.name + '</span>'
       + '<span class="lb-spots">' + (p.spotCount||0) + ' plates</span>'
       + '<span class="lb-pts">' + (p.points||0) + ' pts</span>'
@@ -967,6 +1047,29 @@ function renderLeaderboard() {
     };
     lb.appendChild(row);
   });
+
+  // Beyond 5th — compact cluster, alphabetical, no rank/medal
+  const rest = players.slice(5).sort((a, b) => a.name.localeCompare(b.name));
+  if (rest.length > 0) {
+    const cluster = document.createElement('div');
+    cluster.style.cssText = 'background:var(--bg);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;margin-top:4px;display:flex;flex-wrap:wrap;gap:8px;';
+    rest.forEach(p => {
+      const chip = document.createElement('div');
+      chip.style.cssText = 'display:flex;align-items:center;gap:6px;background:var(--card);border:1px solid var(--border);border-radius:999px;padding:4px 12px;cursor:pointer;';
+      chip.innerHTML = '<span style="font-size:13px;font-weight:700;color:var(--text);">' + p.name + '</span>'
+        + '<span style="font-family:\'Fredoka One\',cursive;font-size:13px;color:var(--green-dark);">' + (p.points||0) + ' pts</span>';
+      chip.onclick = () => {
+        logFilter = p.name;
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.panel').forEach(panel => panel.classList.remove('active'));
+        document.querySelector('[data-tab="log"]').classList.add('active');
+        document.getElementById('tab-log').classList.add('active');
+        renderFeed();
+      };
+      cluster.appendChild(chip);
+    });
+    lb.appendChild(cluster);
+  }
 }
 
 function renderFeed() {
