@@ -11,7 +11,6 @@
 <meta name="apple-mobile-web-app-title" content="Plate Spotter">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
-
 <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -58,11 +57,7 @@ body { font-family: 'Nunito', sans-serif; background: var(--bg); color: var(--te
   background: var(--text);
   border-top: 1px solid rgba(255,255,255,0.1);
 }
-.stat-pill {
-  text-align: center;
-  padding: 10px 8px;
-  border-right: 1px solid rgba(255,255,255,0.1);
-}
+.stat-pill { text-align: center; padding: 10px 8px; border-right: 1px solid rgba(255,255,255,0.1); }
 .stat-pill:last-child { border-right: none; }
 .stat-num { font-family: 'Fredoka One', cursive; font-size: 20px; color: white; }
 .stat-lbl { font-size: 10px; color: rgba(255,255,255,0.55); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 1px; }
@@ -109,7 +104,7 @@ body { font-family: 'Nunito', sans-serif; background: var(--bg); color: var(--te
 .card-title { font-family: 'Fredoka One', cursive; font-size: 16px; margin-bottom: 12px; color: var(--text); }
 
 label { font-size: 13px; font-weight: 700; color: var(--muted); display: block; margin-bottom: 5px; }
-select, input[type=text] {
+select, input[type=text], input[type=date] {
   width: 100%;
   font-family: 'Nunito', sans-serif;
   font-size: 15px;
@@ -141,6 +136,8 @@ select:focus, input:focus { outline: none; border-color: var(--green); }
 .btn:hover { background: var(--green-dark); }
 .btn:active { transform: scale(0.98); }
 .btn.secondary { background: var(--bg); color: var(--text); border: 1.5px solid var(--border); font-size: 14px; padding: 10px; }
+.btn.amber { background: var(--amber); }
+.btn.amber:hover { background: #c87d0e; }
 
 .plates-grid {
   display: grid;
@@ -160,6 +157,7 @@ select:focus, input:focus { outline: none; border-color: var(--green); }
 }
 .plate-cell:active { transform: scale(0.95); }
 .plate-cell.spotted { background: var(--green-light); border-color: var(--green); }
+.plate-cell.disabled-spot { opacity: 0.38; filter: grayscale(60%); cursor: default; pointer-events: none; }
 .plate-abbr { font-family: 'Fredoka One', cursive; font-size: 16px; display: block; color: var(--text); }
 .plate-cell.spotted .plate-abbr { color: var(--green-dark); }
 .plate-name { font-size: 9px; color: var(--muted); display: block; line-height: 1.3; margin-top: 2px; }
@@ -171,6 +169,22 @@ select:focus, input:focus { outline: none; border-color: var(--green); }
   font-size: 8px; display: flex; align-items: center; justify-content: center;
   font-weight: 700;
 }
+
+/* All Plates filter chips */
+.plates-filter-row {
+  display: flex; gap: 6px; flex-wrap: nowrap;
+  overflow-x: auto; -webkit-overflow-scrolling: touch;
+  padding: 2px 0 10px; margin-bottom: 2px;
+}
+.plates-filter-row::-webkit-scrollbar { display: none; }
+.plates-chip {
+  background: var(--card); border: 1.5px solid var(--border);
+  border-radius: 999px; padding: 5px 14px;
+  font-size: 13px; font-weight: 700; font-family: 'Nunito', sans-serif;
+  color: var(--muted); cursor: pointer; white-space: nowrap;
+  transition: all 0.15s; flex-shrink: 0;
+}
+.plates-chip.active { background: var(--text); color: white; border-color: var(--text); }
 
 .lb-list { display: flex; flex-direction: column; gap: 8px; }
 .lb-row {
@@ -198,11 +212,19 @@ select:focus, input:focus { outline: none; border-color: var(--green); }
   border-radius: 8px; padding: 6px 10px; min-width: 52px; text-align: center;
 }
 .feed-abbr.dup { background: var(--amber-light); color: #7A4800; }
+.feed-abbr.undone { background: #f0e8e8; color: #8B2020; }
 .feed-info { flex: 1; }
 .feed-who { font-size: 14px; font-weight: 700; }
 .feed-detail { font-size: 12px; color: var(--muted); margin-top: 2px; }
 .feed-pts { font-family: 'Fredoka One', cursive; font-size: 16px; color: var(--green); }
 .feed-pts.dup { color: var(--amber); }
+.feed-pts.undone { color: #8B2020; font-size: 13px; }
+.feed-undo-btn {
+  background: none; border: none; font-size: 18px; cursor: pointer;
+  opacity: 0.5; padding: 4px 6px; transition: opacity 0.15s;
+  flex-shrink: 0;
+}
+.feed-undo-btn:hover { opacity: 1; }
 
 .player-row { display: flex; gap: 8px; margin-bottom: 10px; }
 .player-row input { flex: 1; margin-bottom: 0; }
@@ -241,6 +263,75 @@ canvas#confetti { position: fixed; top: 0; left: 0; width: 100%; height: 100%; p
 @keyframes bounce { 0%,60%,100%{transform:translateY(0)} 30%{transform:translateY(-10px)} }
 
 .section-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 8px; margin-top: 4px; }
+
+/* Spot panel */
+.spot-context-banner {
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  font-size: 13px;
+  font-weight: 700;
+  display: none;
+}
+.spot-context-banner.first-spot { background: var(--green-light); color: var(--green-dark); display: block; }
+.spot-context-banner.dup-spot { background: var(--amber-light); color: #7A4800; display: block; }
+
+.spot-session-plate {
+  font-family: 'Fredoka One', cursive; font-size: 26px;
+  background: var(--green-light); color: var(--green-dark);
+  border-radius: var(--radius-sm); padding: 8px 18px;
+  display: inline-block; margin-bottom: 14px;
+}
+.spot-session-info { font-size: 12px; color: var(--muted); margin-bottom: 14px; }
+
+.already-logged-list { margin-bottom: 12px; }
+.already-logged-label { font-size: 12px; font-weight: 700; color: var(--muted); margin-bottom: 6px; }
+.already-logged-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.logged-chip {
+  background: var(--green-light); color: var(--green-dark);
+  border-radius: 999px; padding: 4px 12px; font-size: 12px; font-weight: 700;
+}
+
+.spot-btn-row { display: flex; gap: 8px; margin-top: 4px; }
+.spot-btn-row .btn { flex: 1; }
+
+/* Map */
+.map-wrap-outer {
+  position: relative;
+  overflow: hidden;
+  margin: 0 -4px 8px;
+}
+.map-fade-top {
+  position: absolute; top: 0; left: 0; right: 0; height: 80px;
+  background: linear-gradient(to bottom, var(--bg) 0%, transparent 100%);
+  pointer-events: none; z-index: 10;
+}
+#us-map-svg {
+  width: 100%; height: auto; display: block;
+}
+.map-legend {
+  display: flex; align-items: center; gap: 14px;
+  padding: 4px 0 12px; font-size: 12px; color: var(--muted); font-weight: 700; flex-wrap: wrap;
+}
+.map-legend-item { display: flex; align-items: center; gap: 5px; }
+.map-legend-dot { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+
+.ref-panel-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 6px; }
+.ref-panel { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 4px; }
+.ref-cell {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  width: 52px; padding: 6px 4px 5px;
+  border-radius: var(--radius-sm); border: 1.5px solid var(--border);
+  background: var(--card);
+}
+.ref-cell.is-new  { background: #FEF3E2; border-color: #E8A020; }
+.ref-cell.is-old  { background: #E6EEF7; border-color: #1B4F8A; }
+.ref-abbr { font-family: 'Fredoka One', cursive; font-size: 14px; color: var(--muted); }
+.ref-cell.is-new .ref-abbr { color: #7A4A00; }
+.ref-cell.is-old .ref-abbr { color: #1B4F8A; }
+.ref-pts { font-size: 9px; font-weight: 700; color: var(--muted); margin-top: 1px; }
+
+/* Modal */
 .modal-overlay {
   position: fixed; inset: 0; background: rgba(0,0,0,0.5);
   display: flex; align-items: flex-end; justify-content: center;
@@ -253,21 +344,6 @@ canvas#confetti { position: fixed; top: 0; left: 0; width: 100%; height: 100%; p
   transform: translateY(30px); transition: transform 0.25s ease;
 }
 .modal-overlay.show .modal-sheet { transform: translateY(0); }
-.modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
-.modal-title { font-family: 'Fredoka One', cursive; font-size: 18px; }
-.modal-plate { font-family: 'Fredoka One', cursive; font-size: 28px; color: var(--green-dark); background: var(--green-light); border-radius: 10px; padding: 4px 14px; }
-.modal-sub { font-size: 13px; color: var(--muted); margin-bottom: 16px; }
-.player-btn-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
-.player-btn {
-  background: var(--bg); border: 1.5px solid var(--border);
-  border-radius: var(--radius-sm); padding: 14px 10px;
-  font-family: 'Fredoka One', cursive; font-size: 17px;
-  color: var(--text); cursor: pointer; text-align: center;
-  transition: all 0.15s;
-}
-.player-btn:hover { background: var(--green-light); border-color: var(--green); color: var(--green-dark); }
-.player-btn:active { transform: scale(0.96); }
-.player-btn.already-got { opacity: 0.4; cursor: not-allowed; font-size: 13px; }
 .modal-cancel { margin-top: 12px; width: 100%; background: none; border: none; font-family: 'Nunito', sans-serif; font-size: 15px; font-weight: 700; color: var(--muted); cursor: pointer; padding: 10px; }
 
 .install-bar {
@@ -301,116 +377,48 @@ canvas#confetti { position: fixed; top: 0; left: 0; width: 100%; height: 100%; p
 .hist-medal { font-size: 14px; width: 20px; }
 .hist-pname { flex:1; font-weight: 700; }
 .hist-ppts { color: var(--green-dark); font-weight: 700; }
-
-/* ── Map tab ── */
-.map-filter-row {
-  display: flex; gap: 6px; flex-wrap: wrap;
-  padding: 10px 0 10px;
-}
-.map-chip {
-  background: var(--card); border: 1.5px solid var(--border);
-  border-radius: 999px; padding: 5px 14px;
-  font-size: 13px; font-weight: 700; font-family: 'Nunito', sans-serif;
-  color: var(--muted); cursor: pointer; white-space: nowrap;
-  transition: all 0.15s;
-}
-.map-chip.active { background: var(--text); color: white; border-color: var(--text); }
-.map-legend {
-  display: flex; align-items: center; gap: 14px;
-  padding: 4px 0 12px; font-size: 12px; color: var(--muted); font-weight: 700; flex-wrap: wrap;
-}
-.map-legend-item { display: flex; align-items: center; gap: 5px; }
-.map-legend-dot { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
-.ref-panel-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 6px; }
-.ref-panel { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 4px; }
-.ref-cell {
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  width: 52px; padding: 6px 4px 5px;
-  border-radius: var(--radius-sm); border: 1.5px solid var(--border);
-  background: var(--card);
-}
-.ref-cell.is-new  { background: #FEF3E2; border-color: #E8A020; }
-.ref-cell.is-old  { background: #E6EEF7; border-color: #1B4F8A; }
-.ref-abbr { font-family: 'Fredoka One', cursive; font-size: 14px; color: var(--muted); }
-.ref-cell.is-new .ref-abbr { color: #7A4A00; }
-.ref-cell.is-old .ref-abbr { color: #1B4F8A; }
-.ref-pts { font-size: 9px; font-weight: 700; color: var(--muted); margin-top: 1px; }
 </style>
 </head>
 <body>
 
 <div class="loading-screen" id="loading">
   <style>
-    .plate-scene {
-      width: 220px; height: 160px;
-      perspective: 600px;
-      display: flex; align-items: center; justify-content: center;
-    }
-    .plate-wrap {
-      width: 200px; height: 110px;
-      position: relative;
-      transform-style: preserve-3d;
-      animation: plateSpin 2.4s ease-in-out infinite;
-      transform-origin: center center;
-    }
+    .plate-scene { width:220px;height:160px;perspective:600px;display:flex;align-items:center;justify-content:center; }
+    .plate-wrap { width:200px;height:110px;position:relative;transform-style:preserve-3d;animation:plateSpin 2.4s ease-in-out infinite;transform-origin:center center; }
     @keyframes plateSpin {
-      0%   { transform: rotateY(-90deg) rotateX(18deg) scale(0.6); }
-      18%  { transform: rotateY(0deg)   rotateX(18deg) scale(1);   }
-      45%  { transform: rotateY(0deg)   rotateX(18deg) scale(1);   }
-      80%  { transform: rotateY(90deg)  rotateX(18deg) scale(0.6); }
-      80.01%{ transform: rotateY(-90deg) rotateX(18deg) scale(0.6); }
-      100% { transform: rotateY(-90deg) rotateX(18deg) scale(0.6); }
+      0%   {transform:rotateY(-90deg) rotateX(18deg) scale(0.6);}
+      18%  {transform:rotateY(0deg)   rotateX(18deg) scale(1);}
+      45%  {transform:rotateY(0deg)   rotateX(18deg) scale(1);}
+      80%  {transform:rotateY(90deg)  rotateX(18deg) scale(0.6);}
+      80.01%{transform:rotateY(-90deg) rotateX(18deg) scale(0.6);}
+      100% {transform:rotateY(-90deg) rotateX(18deg) scale(0.6);}
     }
-    .plate-svg { width: 200px; height: 110px; display: block; filter: drop-shadow(0 8px 24px rgba(0,0,0,0.45)); }
-    .loading-caption {
-      font-family: 'Fredoka One', cursive;
-      font-size: 15px;
-      color: rgba(255,255,255,0.5);
-      margin-top: 28px;
-      letter-spacing: 0.5px;
-    }
+    .plate-svg { width:200px;height:110px;display:block;filter:drop-shadow(0 8px 24px rgba(0,0,0,0.45)); }
+    .loading-caption { font-family:'Fredoka One',cursive;font-size:15px;color:rgba(255,255,255,0.5);margin-top:28px;letter-spacing:0.5px; }
   </style>
   <div class="plate-scene">
     <div class="plate-wrap">
       <svg class="plate-svg" viewBox="0 0 200 110" xmlns="http://www.w3.org/2000/svg">
-        <!-- Plate base -->
         <rect x="4" y="4" width="192" height="102" rx="14" ry="14" fill="#FFFFFF" stroke="#B0AEAA" stroke-width="1.5"/>
-        <!-- Coloured border band -->
         <rect x="8" y="8" width="184" height="94" rx="11" ry="11" fill="none" stroke="#1D5CA8" stroke-width="5"/>
-        <!-- Top state label -->
         <text x="100" y="24" text-anchor="middle" font-family="Fredoka One, cursive" font-size="10" fill="#1D5CA8" letter-spacing="2">ILLINOIS</text>
-        <!-- Main registration area -->
-        <!-- P on left side -->
         <text x="32" y="72" text-anchor="middle" font-family="Fredoka One, cursive" font-size="36" fill="#1D5CA8" letter-spacing="-1">P</text>
-        <!-- Bison on right side (cartoon Wildlife Prairie Park style) -->
-        <!-- Body -->
         <ellipse cx="155" cy="66" rx="20" ry="13" fill="#5C4A2A"/>
-        <!-- Hump -->
         <ellipse cx="143" cy="56" rx="11" ry="9" fill="#5C4A2A"/>
-        <!-- Head -->
         <circle cx="132" cy="58" r="8" fill="#5C4A2A"/>
-        <!-- Snout -->
         <ellipse cx="126" cy="62" rx="5" ry="4" fill="#6B5535"/>
-        <!-- Eye -->
         <circle cx="130" cy="55" r="1.5" fill="#FFF"/>
         <circle cx="130" cy="55" r="0.8" fill="#1C1C1A"/>
-        <!-- Horn -->
         <path d="M 132 51 Q 128 44 124 46" stroke="#7A6040" stroke-width="2" fill="none" stroke-linecap="round"/>
-        <!-- Front legs -->
         <rect x="138" y="77" width="5" height="14" rx="2" fill="#5C4A2A"/>
         <rect x="147" y="77" width="5" height="14" rx="2" fill="#5C4A2A"/>
-        <!-- Back legs -->
         <rect x="158" y="77" width="5" height="14" rx="2" fill="#5C4A2A"/>
         <rect x="167" y="77" width="5" height="14" rx="2" fill="#5C4A2A"/>
-        <!-- Tail -->
         <path d="M 175 63 Q 182 58 179 54" stroke="#5C4A2A" stroke-width="2.5" fill="none" stroke-linecap="round"/>
-        <!-- Grass tuft under bison -->
         <path d="M 136 91 Q 138 86 140 91" stroke="#2E7D32" stroke-width="1.5" fill="none"/>
         <path d="M 141 91 Q 143 85 145 91" stroke="#2E7D32" stroke-width="1.5" fill="none"/>
         <path d="M 159 91 Q 161 86 163 91" stroke="#2E7D32" stroke-width="1.5" fill="none"/>
-        <!-- Bottom tagline -->
         <text x="100" y="101" text-anchor="middle" font-family="Fredoka One, cursive" font-size="7.5" fill="#1D5CA8" letter-spacing="1.2">WILDLIFE PRAIRIE PARK</text>
-        <!-- Bolt holes -->
         <circle cx="20" cy="55" r="4" fill="#E0DDD6" stroke="#B0AEAA" stroke-width="1"/>
         <circle cx="180" cy="55" r="4" fill="#E0DDD6" stroke="#B0AEAA" stroke-width="1"/>
       </svg>
@@ -420,19 +428,6 @@ canvas#confetti { position: fixed; top: 0; left: 0; width: 100%; height: 100%; p
 </div>
 
 <canvas id="confetti"></canvas>
-
-<div class="modal-overlay" id="player-modal">
-  <div class="modal-sheet">
-    <div class="modal-header">
-      <div class="modal-title">Who spotted it?</div>
-      <div class="modal-plate" id="modal-plate-abbr"></div>
-    </div>
-    <div class="modal-sub" id="modal-plate-name"></div>
-    <div class="player-btn-grid" id="modal-player-btns"></div>
-    <button class="modal-cancel" id="modal-cancel">Cancel</button>
-  </div>
-</div>
-
 
 <div class="topbar">
   <div>
@@ -458,9 +453,8 @@ canvas#confetti { position: fixed; top: 0; left: 0; width: 100%; height: 100%; p
 </div>
 
 <div class="tabs">
-  <button class="tab active" data-tab="map">Map</button>
-  <button class="tab" data-tab="plates">All Plates</button>
-  <button class="tab" data-tab="spot">Spot a Plate</button>
+  <button class="tab active" data-tab="plates">All Plates</button>
+  <button class="tab" data-tab="map">Map</button>
   <button class="tab" data-tab="scores">Scores</button>
   <button class="tab" data-tab="log">Log</button>
   <button class="tab" data-tab="players">Players</button>
@@ -468,44 +462,59 @@ canvas#confetti { position: fixed; top: 0; left: 0; width: 100%; height: 100%; p
 
 <div class="content">
 
-  <div class="panel active" id="tab-map">
-    <div class="map-filter-row" id="map-filter-row">
-      <button class="map-chip active" data-player="__family__">Family</button>
+  <!-- ALL PLATES -->
+  <div class="panel active" id="tab-plates">
+    <div class="plates-filter-row" id="plates-filter-row">
+      <button class="plates-chip active" data-player="__family__">Family</button>
     </div>
-    <div id="us-map-wrap" style="width:100%;margin-bottom:8px;"></div>
+    <div class="plates-grid" id="plates-grid"></div>
+  </div>
+
+  <!-- SPOT A PLATE (hidden from nav) -->
+  <div class="panel" id="tab-spot">
+    <div class="spot-context-banner" id="spot-context-banner"></div>
+    <div class="card">
+      <div id="spot-session-header" style="display:none;margin-bottom:12px;">
+        <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:4px;">PLATE</div>
+        <div class="spot-session-plate" id="spot-session-plate-label">--</div>
+        <div class="spot-session-info" id="spot-session-info"></div>
+        <div class="already-logged-list" id="already-logged-wrap" style="display:none;">
+          <div class="already-logged-label">Already logged this plate:</div>
+          <div class="already-logged-chips" id="already-logged-chips"></div>
+        </div>
+      </div>
+      <label>Who spotted it?</label>
+      <select id="spotter-sel"><option value="">— select player —</option></select>
+      <label id="loc-label" style="display:none;">Location (locked for this session)</label>
+      <label id="loc-label-free">Location (optional)</label>
+      <input type="text" id="loc-in" placeholder="e.g. I-90 near Chicago">
+      <label>Notes (optional)</label>
+      <input type="text" id="notes-in" placeholder="e.g. big red semi">
+      <div class="spot-btn-row">
+        <button class="btn" id="log-btn">Log Sighting 🎯</button>
+        <button class="btn secondary" id="spot-done-btn" style="display:none;">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAP -->
+  <div class="panel" id="tab-map">
+    <div class="map-wrap-outer" id="map-wrap-outer">
+      <div class="map-fade-top"></div>
+      <svg id="us-map-svg" viewBox="0 0 960 720" xmlns="http://www.w3.org/2000/svg"></svg>
+    </div>
     <div class="map-legend">
       <span class="map-legend-item"><span class="map-legend-dot" style="background:#1B4F8A;"></span> Spotted</span>
       <span class="map-legend-item"><span class="map-legend-dot" style="background:#E8A020;"></span> New (24h)</span>
       <span class="map-legend-item"><span class="map-legend-dot" style="background:#D6D3CB;"></span> Not yet</span>
     </div>
-    <div class="ref-panel-label">Northeast &amp; Small States</div>
+    <div class="ref-panel-label">Small &amp; Northeast States</div>
     <div class="ref-panel" id="ne-panel"></div>
-    <div class="ref-panel-label" style="margin-top:10px;">Canadian Provinces &amp; Territories</div>
-    <div class="ref-panel" id="ca-panel"></div>
     <div class="ref-panel-label" style="margin-top:10px;">Other</div>
     <div class="ref-panel" id="other-panel"></div>
   </div>
 
-  <div class="panel" id="tab-spot">
-    <div class="card">
-      <div class="card-title">Log a Sighting</div>
-      <label>Who spotted it?</label>
-      <select id="spotter-sel"><option value="">— select player —</option></select>
-      <label>State or Province</label>
-      <select id="plate-sel"><option value="">— select plate —</option></select>
-      <label>Location (optional)</label>
-      <input type="text" id="loc-in" placeholder="e.g. I-90 near Chicago">
-      <label>Notes (optional)</label>
-      <input type="text" id="notes-in" placeholder="e.g. big red semi">
-      <button class="btn" id="log-btn">Log Sighting 🎯</button>
-    </div>
-  </div>
-
-  <div class="panel" id="tab-plates">
-    <div class="section-label">Tap any plate to quick-log it</div>
-    <div class="plates-grid" id="plates-grid"></div>
-  </div>
-
+  <!-- SCORES -->
   <div class="panel" id="tab-scores">
     <div class="lb-list" id="leaderboard">
       <div class="empty-state"><div class="empty-icon">🏆</div><p>No players yet.<br>Add some in the Players tab!</p></div>
@@ -516,11 +525,13 @@ canvas#confetti { position: fixed; top: 0; left: 0; width: 100%; height: 100%; p
     </div>
   </div>
 
+  <!-- LOG -->
   <div class="panel" id="tab-log">
     <div class="feed-list" id="feed"></div>
     <div class="empty-state" id="no-log"><div class="empty-icon">👀</div><p>No sightings yet.<br>Hit the road and start spotting!</p></div>
   </div>
 
+  <!-- PLAYERS / SETTINGS -->
   <div class="panel" id="tab-players">
     <div class="card">
       <div class="card-title">Add a Player</div>
@@ -583,8 +594,59 @@ const REGIONS = [
 ];
 const TOTAL = REGIONS.length;
 
+const PLATE_POINTS = {
+  IL:5, IA:5, MO:5, WI:5, IN:5, KY:5, MI:5,
+  MN:8, OH:8, TN:8, AR:8, NE:8, KS:8,
+  TX:11, GA:11, FL:11, NY:11, PA:11, CO:11, WA:11, OR:11, CA:11, AZ:11, NM:11,
+  VA:15, NC:15, SC:15, MD:15, NJ:15, CT:15, MA:15, LA:15, MS:15, AL:15,
+  ND:15, SD:15, WY:15, MT:15, ID:15, NV:15, UT:15,
+  ME:20, VT:20, NH:20, WV:20, DE:20, RI:20, OK:20,
+  AK:25, HI:25, DC:25, US:11,
+  AB:25, BC:25, MB:25, NB:25, NL:25, NS:25, ON:25, PE:25, QC:25, SK:25
+};
+function platePoints(abbr) { return PLATE_POINTS[abbr] || 10; }
+
+const PLATE_COLORS = {
+  AL:{bg:'#003087',text:'#FFFFFF',border:'#C8102E'}, AK:{bg:'#FFD700',text:'#003087',border:'#003087'},
+  AZ:{bg:'#CC0000',text:'#FFFFFF',border:'#003087'}, AR:{bg:'#003087',text:'#FFFFFF',border:'#FFD700'},
+  CA:{bg:'#003087',text:'#FDB913',border:'#003087'}, CO:{bg:'#FFFFFF',text:'#003087',border:'#2E8B57'},
+  CT:{bg:'#003087',text:'#FFFFFF',border:'#003087'}, DE:{bg:'#FFD700',text:'#003A70',border:'#003A70'},
+  FL:{bg:'#FF8C00',text:'#003087',border:'#2E8B57'}, GA:{bg:'#FFFFFF',text:'#CC0000',border:'#CC0000'},
+  HI:{bg:'#003087',text:'#FFD700',border:'#003087'}, ID:{bg:'#2E8B57',text:'#FFFFFF',border:'#003087'},
+  IL:{bg:'#FFFFFF',text:'#003087',border:'#CC0000'}, IN:{bg:'#003087',text:'#FFFFFF',border:'#FFD700'},
+  IA:{bg:'#003087',text:'#FFD700',border:'#003087'}, KS:{bg:'#003087',text:'#FFD700',border:'#FFD700'},
+  KY:{bg:'#003087',text:'#FFFFFF',border:'#C8102E'}, LA:{bg:'#CC0000',text:'#FFFFFF',border:'#003087'},
+  ME:{bg:'#003087',text:'#FFFFFF',border:'#2E8B57'}, MD:{bg:'#CC0000',text:'#FFD700',border:'#000000'},
+  MA:{bg:'#003087',text:'#FFFFFF',border:'#2E8B57'}, MI:{bg:'#003087',text:'#FFFFFF',border:'#003087'},
+  MN:{bg:'#FFFFFF',text:'#003087',border:'#2E8B57'}, MS:{bg:'#003087',text:'#FFFFFF',border:'#CC0000'},
+  MO:{bg:'#FFFFFF',text:'#003087',border:'#CC0000'}, MT:{bg:'#003087',text:'#FFD700',border:'#CC0000'},
+  NE:{bg:'#CC0000',text:'#FFFFFF',border:'#003087'}, NV:{bg:'#003087',text:'#C0C0C0',border:'#C0C0C0'},
+  NH:{bg:'#2E8B57',text:'#FFFFFF',border:'#FFD700'}, NJ:{bg:'#FFD700',text:'#003087',border:'#003087'},
+  NM:{bg:'#FFD700',text:'#CC0000',border:'#CC0000'}, NY:{bg:'#FFD700',text:'#003087',border:'#003087'},
+  NC:{bg:'#CC0000',text:'#FFFFFF',border:'#003087'}, ND:{bg:'#003087',text:'#FFFFFF',border:'#FFD700'},
+  OH:{bg:'#CC0000',text:'#FFFFFF',border:'#003087'}, OK:{bg:'#2E8B57',text:'#FFD700',border:'#CC0000'},
+  OR:{bg:'#003087',text:'#FFD700',border:'#003087'}, PA:{bg:'#003087',text:'#FFD700',border:'#FFD700'},
+  RI:{bg:'#FFD700',text:'#003087',border:'#003087'}, SC:{bg:'#003087',text:'#FFFFFF',border:'#C8102E'},
+  SD:{bg:'#003087',text:'#FFD700',border:'#CC0000'}, TN:{bg:'#FFFFFF',text:'#FF8C00',border:'#003087'},
+  TX:{bg:'#FFFFFF',text:'#003087',border:'#003087'}, UT:{bg:'#FFFFFF',text:'#000000',border:'#CC0000'},
+  VT:{bg:'#2E8B57',text:'#FFFFFF',border:'#FFD700'}, VA:{bg:'#003087',text:'#FFFFFF',border:'#003087'},
+  WA:{bg:'#003087',text:'#2E8B57',border:'#2E8B57'}, WV:{bg:'#003087',text:'#FFD700',border:'#FFD700'},
+  WI:{bg:'#003087',text:'#FFFFFF',border:'#003087'}, WY:{bg:'#CC0000',text:'#FFD700',border:'#003087'},
+  DC:{bg:'#FFFFFF',text:'#CC0000',border:'#CC0000'}, AB:{bg:'#003087',text:'#FFD700',border:'#CC0000'},
+  BC:{bg:'#003087',text:'#FFFFFF',border:'#2E8B57'}, MB:{bg:'#003087',text:'#FFD700',border:'#003087'},
+  NB:{bg:'#FFD700',text:'#CC0000',border:'#CC0000'}, NL:{bg:'#2E8B57',text:'#FFFFFF',border:'#003087'},
+  NS:{bg:'#003087',text:'#FFD700',border:'#003087'}, ON:{bg:'#003087',text:'#FFFFFF',border:'#CC0000'},
+  PE:{bg:'#CC0000',text:'#FFFFFF',border:'#FFD700'}, QC:{bg:'#003087',text:'#FFFFFF',border:'#FFFFFF'},
+  SK:{bg:'#2E8B57',text:'#FFD700',border:'#FFD700'}, US:{bg:'#002868',text:'#FFFFFF',border:'#BF0A30'}
+};
+
 let gameState = { players: {}, spotted: {}, log: {} };
-let logFilter = null; // player name filter for log tab
+let logFilter = null;
+let platesFilter = '__family__'; // player filter on All Plates tab
+
+// Spot session state
+let spotSession = null;
+// { abbr, lockedLoc, loggedSpotters: [] }
 
 const syncDot = document.getElementById('sync-dot');
 const syncLabel = document.getElementById('sync-label');
@@ -603,7 +665,6 @@ onValue(ref(db, 'game'), async snap => {
     const { update } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js");
     await update(ref(db), { 'game/startedAt': Date.now() });
   }
-  // Set Dec 31 default on deadline input
   const dlInput = document.getElementById('deadline-input');
   if (dlInput && !dlInput.value) {
     const yr = new Date().getFullYear();
@@ -612,235 +673,285 @@ onValue(ref(db, 'game'), async snap => {
   render();
 }, err => { setConnected(false); });
 
+// ── Tab switching ──
+function switchTab(tabName) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  const tabBtn = document.querySelector('[data-tab="' + tabName + '"]');
+  if (tabBtn) tabBtn.classList.add('active');
+  document.getElementById('tab-' + tabName).classList.add('active');
+}
 
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.onclick = () => {
+    switchTab(tab.dataset.tab);
+    if (tab.dataset.tab === 'log') { logFilter = null; renderFeed(); }
+  };
+});
+
+// ── Countdown ──
 let countdownInterval = null;
-
 function formatGameStart(ts) {
   if (!ts) return 'Game in progress';
   const d = new Date(ts);
   const today = new Date();
-  const isToday = d.toDateString() === today.toDateString();
-  const dateStr = d.toLocaleDateString(undefined, {month:'short', day:'numeric', year:'numeric'});
-  if (isToday) {
-    const timeStr = d.toLocaleTimeString(undefined, {hour:'numeric', minute:'2-digit'});
-    return 'Game started today at ' + timeStr;
+  if (d.toDateString() === today.toDateString()) {
+    return 'Game started today at ' + d.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'});
   }
-  return 'Game started ' + dateStr;
+  return 'Game started ' + d.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'});
 }
-
 function startCountdown(deadlineTs) {
   if (countdownInterval) clearInterval(countdownInterval);
   function tick() {
-    const now = Date.now();
-    const diff = deadlineTs - now;
-    if (diff <= 0) {
-      clearInterval(countdownInterval);
-      document.getElementById('trip-label').textContent = 'Game Over!';
-      doReset();
-      return;
-    }
-    const days = Math.floor(diff / 86400000);
-    const hrs = Math.floor((diff % 86400000) / 3600000);
-    const mins = Math.floor((diff % 3600000) / 60000);
-    const secs = Math.floor((diff % 60000) / 1000);
-    let label = 'New game starts in: ';
-    if (days > 0) label += days + 'd ' + hrs + 'h ' + mins + 'm';
-    else if (hrs > 0) label += hrs + 'h ' + mins + 'm ' + secs + 's';
-    else label += mins + 'm ' + secs + 's';
+    const diff = deadlineTs - Date.now();
+    if (diff <= 0) { clearInterval(countdownInterval); document.getElementById('trip-label').textContent = 'Game Over!'; doReset(); return; }
+    const days = Math.floor(diff/86400000);
+    const hrs = Math.floor((diff%86400000)/3600000);
+    const mins = Math.floor((diff%3600000)/60000);
+    const secs = Math.floor((diff%60000)/1000);
+    let label = 'New game in: ';
+    if (days>0) label += days+'d '+hrs+'h '+mins+'m';
+    else if (hrs>0) label += hrs+'h '+mins+'m '+secs+'s';
+    else label += mins+'m '+secs+'s';
     document.getElementById('trip-label').textContent = label;
   }
-  tick();
-  countdownInterval = setInterval(tick, 1000);
+  tick(); countdownInterval = setInterval(tick,1000);
 }
 
-
-// ── Map filter state (local UI only, no Firebase) ──
-let mapFilterPlayer = '__family__';
-
-function getSpotStatus(abbr) {
-  // Returns 'none' | 'new' (< 24h) | 'old' (>= 24h) based on current filter
-  const spotted = gameState.spotted || {};
-  if (mapFilterPlayer === '__family__') {
-    const entry = spotted[abbr];
-    if (!entry) return 'none';
-    const age = Date.now() - (entry.ts || 0);
-    return age < 86400000 ? 'new' : 'old';
-  } else {
-    // Player view: check if this player has spotted it
-    const player = Object.values(gameState.players).find(p => p.name === mapFilterPlayer);
-    if (!player || !player.spotted || !player.spotted[abbr]) return 'none';
-    // Use family timestamp for the 24h window
-    const familyEntry = spotted[abbr];
-    const age = familyEntry ? Date.now() - (familyEntry.ts || 0) : Infinity;
-    return age < 86400000 ? 'new' : 'old';
-  }
-}
-
-function mapFill(status)     { return status === 'new' ? '#E8A020' : status === 'old' ? '#1B4F8A' : '#D6D3CB'; }
-function mapTextCol(status)  { return status !== 'none' ? '#FFFFFF' : '#9A9890'; }
-
-function renderMapChips() {
-  const row = document.getElementById('map-filter-row');
-  if (!row) return;
-  row.innerHTML = '';
-  const make = (label, player) => {
-    const btn = document.createElement('button');
-    btn.className = 'map-chip' + (mapFilterPlayer === player ? ' active' : '');
-    btn.textContent = label;
-    btn.onclick = () => { mapFilterPlayer = player; renderMap(); };
-    row.appendChild(btn);
-  };
-  make('Family', '__family__');
-  Object.values(gameState.players).forEach(p => make(p.name, p.name));
-}
-
-function renderMap() {
-  renderMapChips();
-  const wrap = document.getElementById('us-map-wrap');
-  if (!wrap) return;
-
-  // Accurate simplified state paths, viewBox 0 0 960 620
-  const PATHS = {
-    WA:'M 117,35 L 200,22 L 215,45 L 225,72 L 190,80 L 160,86 L 117,82 Z',
-    OR:'M 115,84 L 160,86 L 190,80 L 225,72 L 235,155 L 115,170 Z',
-    CA:'M 113,170 L 165,162 L 182,210 L 192,278 L 180,348 L 155,392 L 113,368 L 93,300 L 98,230 Z',
-    ID:'M 225,72 L 272,62 L 288,90 L 295,175 L 258,182 L 235,155 Z',
-    NV:'M 160,162 L 235,155 L 258,182 L 248,268 L 222,348 L 178,338 L 162,278 Z',
-    UT:'M 235,155 L 295,150 L 308,258 L 248,265 Z',
-    AZ:'M 178,338 L 222,348 L 308,342 L 310,435 L 178,432 Z',
-    MT:'M 225,28 L 382,14 L 390,110 L 295,118 L 272,62 Z',
-    WY:'M 272,62 L 390,52 L 400,160 L 295,165 Z',
-    CO:'M 295,165 L 400,158 L 408,258 L 308,262 Z',
-    NM:'M 308,262 L 408,256 L 415,362 L 308,364 Z',
-    ND:'M 382,14 L 514,6 L 518,105 L 390,108 Z',
-    SD:'M 390,108 L 518,103 L 522,198 L 392,200 Z',
-    NE:'M 392,200 L 520,196 L 524,272 L 394,274 Z',
-    KS:'M 394,274 L 522,270 L 526,348 L 396,350 Z',
-    OK:'M 396,350 L 526,346 L 528,400 L 434,402 L 434,418 L 396,418 Z',
-    TX:'M 396,418 L 434,418 L 434,402 L 528,398 L 534,508 L 448,530 L 396,492 Z',
-    MN:'M 514,6 L 582,2 L 592,80 L 566,118 L 520,118 Z',
-    IA:'M 518,118 L 568,114 L 576,198 L 520,200 Z',
-    MO:'M 520,200 L 574,196 L 582,300 L 520,304 L 518,278 Z',
-    AR:'M 520,304 L 580,298 L 584,370 L 520,372 Z',
-    LA:'M 520,372 L 582,366 L 584,428 L 548,444 L 520,428 Z',
-    WI:'M 566,62 L 618,54 L 630,130 L 608,152 L 572,148 L 568,118 Z',
-    IL:'M 568,150 L 606,148 L 618,264 L 572,268 L 568,228 Z',
-    MI:'M 606,54 L 658,48 L 672,100 L 646,122 L 614,128 L 608,152 Z',
-    IN:'M 606,150 L 646,146 L 652,240 L 608,244 Z',
-    OH:'M 646,122 L 696,116 L 704,218 L 648,222 Z',
-    KY:'M 608,244 L 704,218 L 710,278 L 608,282 Z',
-    TN:'M 570,302 L 708,278 L 714,318 L 572,322 Z',
-    MS:'M 572,322 L 618,320 L 622,400 L 574,404 Z',
-    AL:'M 618,322 L 658,320 L 662,416 L 620,418 Z',
-    GA:'M 658,282 L 706,278 L 712,386 L 658,388 Z',
-    FL:'M 656,388 L 712,382 L 728,434 L 708,476 L 672,462 L 648,420 Z',
-    SC:'M 706,278 L 752,268 L 758,322 L 708,326 Z',
-    NC:'M 704,240 L 774,226 L 780,272 L 706,278 Z',
-    VA:'M 698,214 L 774,198 L 778,240 L 700,248 Z',
-    PA:'M 644,158 L 770,142 L 774,192 L 646,202 Z',
-    NY:'M 644,114 L 770,98 L 774,146 L 680,158 L 648,158 Z',
-    WV:'M 660,200 L 700,190 L 706,224 L 664,230 Z',
-    MD:'M 700,190 L 764,178 L 768,200 L 702,208 Z',
-    DE:'M 766,176 L 786,173 L 788,200 L 766,202 Z',
-    NJ:'M 766,148 L 790,145 L 792,182 L 768,184 Z',
-    CT:'M 790,130 L 814,127 L 816,150 L 790,152 Z',
-    RI:'M 814,124 L 830,122 L 832,142 L 814,144 Z',
-    MA:'M 764,102 L 836,94 L 838,126 L 764,130 Z',
-    VT:'M 764,74 L 784,70 L 786,104 L 764,106 Z',
-    NH:'M 784,67 L 802,62 L 806,102 L 786,105 Z',
-    ME:'M 802,40 L 842,30 L 852,86 L 806,94 Z'
-  };
-
-  // Label positions for main map states
-  const LABELS = {
-    WA:{x:168,y:57},OR:{x:173,y:128},CA:{x:140,y:280},ID:{x:258,y:130},
-    NV:{x:200,y:260},UT:{x:270,y:208},AZ:{x:242,y:390},MT:{x:308,y:66},
-    WY:{x:336,y:112},CO:{x:352,y:212},NM:{x:360,y:316},ND:{x:448,y:58},
-    SD:{x:454,y:152},NE:{x:458,y:238},KS:{x:460,y:312},OK:{x:462,y:378},
-    TX:{x:462,y:468},MN:{x:548,y:62},IA:{x:546,y:158},MO:{x:549,y:252},
-    AR:{x:550,y:336},LA:{x:550,y:408},WI:{x:596,y:104},IL:{x:591,y:208},
-    MI:{x:634,y:90},IN:{x:628,y:194},OH:{x:674,y:170},KY:{x:658,y:252},
-    TN:{x:640,y:302},MS:{x:596,y:362},AL:{x:638,y:370},GA:{x:682,y:334},
-    FL:{x:680,y:430},SC:{x:730,y:298},NC:{x:738,y:254},VA:{x:735,y:226},
-    PA:{x:708,y:175},NY:{x:708,y:132},ME:{x:826,y:62}
-  };
-
-  // These go to reference panels only
-  const REF_ONLY = new Set(['CT','DE','MA','MD','NJ','NH','RI','VT','WV','AK','HI','DC','US','AB','BC','MB','NB','NL','NS','ON','PE','QC','SK']);
-
-  let svg = `<svg viewBox="88 0 780 510" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block;">`;
-  svg += `<defs><filter id="dropshadow"><feDropShadow dx="0" dy="1" stdDeviation="1" flood-color="rgba(0,0,0,0.14)"/></filter></defs>`;
-
-  Object.entries(PATHS).forEach(([abbr, path]) => {
-    if (REF_ONLY.has(abbr)) return;
-    const status = getSpotStatus(abbr);
-    svg += `<path d="${path}" fill="${mapFill(status)}" stroke="#FFF" stroke-width="1.2" stroke-linejoin="round" filter="url(#dropshadow)"/>`;
-    if (LABELS[abbr]) {
-      svg += `<text x="${LABELS[abbr].x}" y="${LABELS[abbr].y + 4}" text-anchor="middle" font-family="Fredoka One,cursive" font-size="10" fill="${mapTextCol(status)}" pointer-events="none">${abbr}</text>`;
-    }
-  });
-
-  svg += `</svg>`;
-  wrap.innerHTML = svg;
-
-  // Reference panels
-  renderRefPanel('ne-panel',    ['CT','DE','MA','MD','NJ','NH','RI','VT','WV']);
-  renderRefPanel('ca-panel',    ['AB','BC','MB','NB','NL','NS','ON','PE','QC','SK']);
-  renderRefPanel('other-panel', ['AK','HI','DC','US']);
-}
-
-function renderRefPanel(id, abbrs) {
-  const panel = document.getElementById(id);
-  if (!panel) return;
-  panel.innerHTML = '';
-  const NAMES = {
-    CT:'Connecticut', DE:'Delaware', MA:'Massachusetts', MD:'Maryland',
-    NJ:'New Jersey', NH:'New Hampshire', RI:'Rhode Island', VT:'Vermont', WV:'West Virginia',
-    AB:'Alberta', BC:'Brit. Columbia', MB:'Manitoba', NB:'New Brunswick',
-    NL:'Newfoundland', NS:'Nova Scotia', ON:'Ontario', PE:'PEI', QC:'Quebec', SK:'Saskatchewan',
-    AK:'Alaska', HI:'Hawaii', DC:'Washington DC', US:'US Government'
-  };
-  abbrs.forEach(abbr => {
-    const status = getSpotStatus(abbr);
-    const pts = status !== 'none' ? platePoints(abbr) : null;
-    const cell = document.createElement('div');
-    cell.className = 'ref-cell' + (status === 'new' ? ' is-new' : status === 'old' ? ' is-old' : '');
-    cell.title = NAMES[abbr] || abbr;
-    cell.innerHTML = `<span class="ref-abbr">${abbr}</span>` + (pts !== null ? `<span class="ref-pts">${pts} pts</span>` : '');
-    panel.appendChild(cell);
+// ── Location ──
+const LOCATION_FALLBACKS = [
+  "somewhere between a gas station and regret 🛣️","approximately Earth 🌍","definitely not lost 🧭",
+  "near an exit ramp, probably 🚦","passing something called 'Historic Downtown' 🏚️",
+  "within 40 miles of a Cracker Barrel 🍽️","on a road that goes somewhere 🗺️",
+  "third rest stop from the left 🚻","behind a truck that really needs a wash 🚛",
+  "somewhere a GPS would call 'recalculating' 📡"
+];
+let lastKnownLocation = '';
+async function getLocation() {
+  return new Promise(resolve => {
+    if (!navigator.geolocation) { resolve(lastKnownLocation||LOCATION_FALLBACKS[Math.floor(Math.random()*LOCATION_FALLBACKS.length)]); return; }
+    navigator.geolocation.getCurrentPosition(async pos => {
+      try {
+        const {latitude:lat,longitude:lon} = pos.coords;
+        const r = await fetch('https://nominatim.openstreetmap.org/reverse?lat='+lat+'&lon='+lon+'&format=json');
+        const d = await r.json();
+        const road = d.address.road||d.address.highway||'';
+        const city = d.address.city||d.address.town||d.address.village||d.address.county||'';
+        const state = d.address.state_code||d.address.state||'';
+        let loc = '';
+        if (road&&city) loc=road+', '+city+(state?', '+state:'');
+        else if (city) loc=city+(state?', '+state:'');
+        else if (road) loc=road+(state?', '+state:'');
+        else loc=state||LOCATION_FALLBACKS[Math.floor(Math.random()*LOCATION_FALLBACKS.length)];
+        lastKnownLocation = loc; resolve(loc);
+      } catch(e) { resolve(lastKnownLocation||LOCATION_FALLBACKS[Math.floor(Math.random()*LOCATION_FALLBACKS.length)]); }
+    }, ()=>{ resolve(lastKnownLocation||LOCATION_FALLBACKS[Math.floor(Math.random()*LOCATION_FALLBACKS.length)]); },{timeout:5000});
   });
 }
 
-
-
+// ── Render master ──
 function render() {
   const spottedKeys = Object.keys(gameState.spotted);
-  if (gameState.deadline) {
-    startCountdown(gameState.deadline);
-  } else {
-    document.getElementById('trip-label').textContent = formatGameStart(gameState.startedAt);
-  }
+  if (gameState.deadline) startCountdown(gameState.deadline);
+  else document.getElementById('trip-label').textContent = formatGameStart(gameState.startedAt);
   const spottedCount = spottedKeys.length;
-  const pct = Math.round(spottedCount / TOTAL * 100);
+  const pct = Math.round(spottedCount/TOTAL*100);
   document.getElementById('s-spotted').textContent = spottedCount;
-  document.getElementById('s-remain').textContent = TOTAL - spottedCount;
-  document.getElementById('pct-lbl').textContent = pct + '%';
-  document.getElementById('prog-fill').style.width = pct + '%';
+  document.getElementById('s-remain').textContent = TOTAL-spottedCount;
+  document.getElementById('pct-lbl').textContent = pct+'%';
+  document.getElementById('prog-fill').style.width = pct+'%';
   const players = Object.values(gameState.players);
   document.getElementById('s-players').textContent = players.length;
-  const totalPts = players.reduce((a, p) => a + (p.points || 0), 0);
+  const totalPts = players.reduce((a,p)=>a+(p.points||0),0);
   document.getElementById('s-pts').textContent = totalPts;
+  renderPlatesFilter();
+  renderGrid();
   renderMap();
   renderSpotterSel();
-  renderPlateSel();
-  renderGrid();
   renderLeaderboard();
   renderFeed();
   renderChips();
   renderHistory();
 }
 
+// ── All Plates filter chips ──
+function renderPlatesFilter() {
+  const row = document.getElementById('plates-filter-row');
+  if (!row) return;
+  const players = Object.values(gameState.players);
+  // Preserve active selection if player still exists
+  if (platesFilter !== '__family__' && !players.find(p=>p.name===platesFilter)) platesFilter = '__family__';
+  row.innerHTML = '';
+  const make = (label, val) => {
+    const btn = document.createElement('button');
+    btn.className = 'plates-chip' + (platesFilter===val?' active':'');
+    btn.textContent = label;
+    btn.dataset.player = val;
+    btn.onclick = () => { platesFilter = val; renderPlatesFilter(); renderGrid(); };
+    row.appendChild(btn);
+  };
+  make('Family','__family__');
+  players.forEach(p => make(p.name, p.name));
+}
+
+// ── Plate grid ──
+function renderGrid() {
+  const grid = document.getElementById('plates-grid');
+  grid.innerHTML = '';
+  const players = Object.values(gameState.players);
+
+  REGIONS.forEach(r => {
+    const cell = document.createElement('div');
+    const familySpotted = !!gameState.spotted[r.abbr];
+    const colors = PLATE_COLORS[r.abbr]||{bg:'#FFFFFF',text:'#003087',border:'#003087'};
+
+    // Determine if this cell should be disabled for tapping
+    let disabled = false;
+    if (platesFilter === '__family__') {
+      // Disable only if ALL players have spotted it
+      if (players.length > 0 && players.every(p => p.spotted && p.spotted[r.abbr])) disabled = true;
+    } else {
+      // Disable if this player has already spotted it
+      const player = players.find(p=>p.name===platesFilter);
+      if (player && player.spotted && player.spotted[r.abbr]) disabled = true;
+    }
+
+    // Visual: spotted = colour plate, unspotted = greyed
+    if (familySpotted) {
+      cell.className = 'plate-cell spotted' + (disabled?' disabled-spot':'');
+      cell.style.cssText = 'background:#D6D3CB;border-color:#B8B5AD;opacity:0.55;filter:grayscale(60%);';
+    } else {
+      cell.className = 'plate-cell unspotted' + (disabled?' disabled-spot':'');
+      cell.style.cssText = 'background:'+colors.bg+';border-color:'+colors.border+';opacity:1;font-weight:900;';
+    }
+
+    const abbrEl = familySpotted
+      ? '<span class="plate-abbr" style="color:#6B6860">'+r.abbr+'</span>'
+      : '<span class="plate-abbr" style="color:'+colors.text+';font-weight:900">'+r.abbr+'</span>';
+    const nameEl = familySpotted
+      ? '<span class="plate-name" style="color:#6B6860">'+r.name+'</span>'
+      : '<span class="plate-name" style="color:'+colors.text+';opacity:0.85">'+r.name+'</span>';
+    const badge = familySpotted ? '<div class="check-badge" style="background:#6B6860;color:white">✓</div>' : '';
+    cell.innerHTML = abbrEl + nameEl + badge;
+
+    if (!disabled) {
+      cell.onclick = () => openSpotPanel(r.abbr);
+    }
+    grid.appendChild(cell);
+  });
+}
+
+// ── Open Spot Panel ──
+function openSpotPanel(abbr) {
+  const players = Object.values(gameState.players);
+  if (players.length === 0) { alert('Add players first in the Players tab!'); return; }
+
+  // Start a new session for this plate
+  spotSession = { abbr, lockedLoc: null, loggedSpotters: [] };
+
+  // Switch to spot tab
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('tab-spot').classList.add('active');
+  // Don't highlight any nav tab since Spot isn't in nav
+
+  updateSpotPanel();
+
+  // Try to get location if not cached
+  const locInput = document.getElementById('loc-in');
+  if (!locInput.value) {
+    locInput.placeholder = 'Getting location…';
+    getLocation().then(loc => {
+      if (!spotSession?.lockedLoc) locInput.placeholder = loc;
+    });
+  }
+}
+
+function updateSpotPanel() {
+  if (!spotSession) return;
+  const { abbr, lockedLoc, loggedSpotters } = spotSession;
+  const region = REGIONS.find(r=>r.abbr===abbr);
+  const familyFirstSpot = !gameState.spotted[abbr] && loggedSpotters.length === 0;
+  const isFirstEver = !gameState.spotted[abbr];
+
+  // Context banner
+  const banner = document.getElementById('spot-context-banner');
+  if (isFirstEver && loggedSpotters.length === 0) {
+    banner.className = 'spot-context-banner first-spot';
+    banner.textContent = '🎉 New plate! Who spotted it first?';
+  } else if (!isFirstEver) {
+    banner.className = 'spot-context-banner dup-spot';
+    banner.textContent = '⚠️ This plate was already logged — no first-spot bonus, but you still earn ' + platePoints(abbr) + ' pts!';
+  } else {
+    banner.className = 'spot-context-banner first-spot';
+    banner.textContent = '➕ Adding another spotter — they earn ' + platePoints(abbr) + ' pts (no first-spot bonus)';
+  }
+
+  // Session header
+  const header = document.getElementById('spot-session-header');
+  header.style.display = 'block';
+  document.getElementById('spot-session-plate-label').textContent = abbr + (region ? ' — ' + region.name : '');
+
+  // Already logged chips
+  const alreadyWrap = document.getElementById('already-logged-wrap');
+  const alreadyChips = document.getElementById('already-logged-chips');
+  if (loggedSpotters.length > 0) {
+    alreadyWrap.style.display = 'block';
+    alreadyChips.innerHTML = loggedSpotters.map(n=>'<span class="logged-chip">✓ '+n+'</span>').join('');
+  } else {
+    alreadyWrap.style.display = 'none';
+  }
+
+  // Spotter select — grey out already logged AND already spotted in DB
+  renderSpotterSelForSpot(abbr, loggedSpotters);
+
+  // Location: lock after first log
+  const locInput = document.getElementById('loc-in');
+  const locLabelFree = document.getElementById('loc-label-free');
+  const locLabelLocked = document.getElementById('loc-label');
+  if (lockedLoc !== null) {
+    locInput.value = lockedLoc;
+    locInput.readOnly = true;
+    locInput.style.opacity = '0.6';
+    locLabelFree.style.display = 'none';
+    locLabelLocked.style.display = 'block';
+  } else {
+    locInput.readOnly = false;
+    locInput.style.opacity = '1';
+    locLabelFree.style.display = 'block';
+    locLabelLocked.style.display = 'none';
+  }
+
+  // Show Done button after first successful log
+  document.getElementById('spot-done-btn').style.display = loggedSpotters.length > 0 ? '' : 'none';
+  document.getElementById('log-btn').textContent = loggedSpotters.length > 0 ? 'Log Another Spotter 🎯' : 'Log Sighting 🎯';
+}
+
+function renderSpotterSelForSpot(abbr, sessionLoggedSpotters) {
+  const sel = document.getElementById('spotter-sel');
+  sel.innerHTML = '<option value="">— select player —</option>';
+  Object.values(gameState.players).forEach(p => {
+    const alreadyInDB = p.spotted && p.spotted[abbr];
+    const alreadyInSession = sessionLoggedSpotters.includes(p.name);
+    const o = document.createElement('option');
+    o.value = p.name;
+    if (alreadyInDB || alreadyInSession) {
+      o.textContent = p.name + ' (already got it)';
+      o.disabled = true;
+    } else {
+      o.textContent = p.name;
+    }
+    sel.appendChild(o);
+  });
+  // Pre-select player if plates filter is set
+  if (platesFilter !== '__family__') {
+    const opt = [...sel.options].find(o=>o.value===platesFilter && !o.disabled);
+    if (opt) sel.value = platesFilter;
+  }
+}
+
 function renderSpotterSel() {
+  // Only update if spot panel is not active (to avoid overwriting session state)
+  if (document.getElementById('tab-spot').classList.contains('active') && spotSession) return;
   const sel = document.getElementById('spotter-sel');
   const cur = sel.value;
   sel.innerHTML = '<option value="">— select player —</option>';
@@ -852,544 +963,625 @@ function renderSpotterSel() {
   });
 }
 
-function renderPlateSel() {
-  const sel = document.getElementById('plate-sel');
-  const cur = sel.value;
-  sel.innerHTML = '<option value="">— select plate —</option>';
-  REGIONS.forEach(r => {
-    const o = document.createElement('option');
-    o.value = r.abbr;
-    const spotted = gameState.spotted[r.abbr];
-    o.textContent = r.abbr + ' — ' + r.name + (spotted ? ' ✓' : '');
-    if (r.abbr === cur) o.selected = true;
-    sel.appendChild(o);
-  });
-}
-
-
-
-const PLATE_POINTS = {
-  IL:5,
-  IA:5, MO:5, WI:5, IN:5, KY:5, MI:5,
-  MN:8, OH:8, TN:8, AR:8, NE:8, KS:8,
-  TX:11, GA:11, FL:11, NY:11, PA:11, CO:11, WA:11, OR:11, CA:11, AZ:11, NM:11,
-  VA:15, NC:15, SC:15, MD:15, NJ:15, CT:15, MA:15, LA:15, MS:15, AL:15,
-  ND:15, SD:15, WY:15, MT:15, ID:15, NV:15, UT:15,
-  ME:20, VT:20, NH:20, WV:20, DE:20, RI:20, OK:20,
-  AK:25, HI:25, DC:25, US:11,
-  AB:25, BC:25, MB:25, NB:25, NL:25, NS:25, ON:25, PE:25, QC:25, SK:25
-};
-function platePoints(abbr) { return PLATE_POINTS[abbr] || 10; }
-
-const LOCATION_FALLBACKS = [
-  "somewhere between a gas station and regret 🛣️",
-  "approximately Earth 🌍",
-  "definitely not lost 🧭",
-  "near an exit ramp, probably 🚦",
-  "passing something called 'Historic Downtown' 🏚️",
-  "within 40 miles of a Cracker Barrel 🍽️",
-  "on a road that goes somewhere 🗺️",
-  "third rest stop from the left 🚻",
-  "behind a truck that really needs a wash 🚛",
-  "somewhere a GPS would call 'recalculating' 📡"
-];
-let lastKnownLocation = '';
-
-async function getLocation() {
-  return new Promise(resolve => {
-    if (!navigator.geolocation) { resolve(lastKnownLocation || LOCATION_FALLBACKS[Math.floor(Math.random()*LOCATION_FALLBACKS.length)]); return; }
-    navigator.geolocation.getCurrentPosition(async pos => {
-      try {
-        const {latitude: lat, longitude: lon} = pos.coords;
-        const r = await fetch('https://nominatim.openstreetmap.org/reverse?lat='+lat+'&lon='+lon+'&format=json');
-        const d = await r.json();
-        const road = d.address.road || d.address.highway || '';
-        const city = d.address.city || d.address.town || d.address.village || d.address.county || '';
-        const state = d.address.state_code || d.address.state || '';
-        let loc = '';
-        if (road && city) loc = road + ', ' + city + (state ? ', '+state : '');
-        else if (city) loc = city + (state ? ', '+state : '');
-        else if (road) loc = road + (state ? ', '+state : '');
-        else loc = state || LOCATION_FALLBACKS[Math.floor(Math.random()*LOCATION_FALLBACKS.length)];
-        lastKnownLocation = loc;
-        resolve(loc);
-      } catch(e) { resolve(lastKnownLocation || LOCATION_FALLBACKS[Math.floor(Math.random()*LOCATION_FALLBACKS.length)]); }
-    }, () => { resolve(lastKnownLocation || LOCATION_FALLBACKS[Math.floor(Math.random()*LOCATION_FALLBACKS.length)]); }, {timeout:5000});
-  });
-}
-
-const PLATE_COLORS = {
-  AL: {bg:'#003087',text:'#FFFFFF',border:'#C8102E'},
-  AK: {bg:'#FFD700',text:'#003087',border:'#003087'},
-  AZ: {bg:'#CC0000',text:'#FFFFFF',border:'#003087'},
-  AR: {bg:'#003087',text:'#FFFFFF',border:'#FFD700'},
-  CA: {bg:'#003087',text:'#FDB913',border:'#003087'},
-  CO: {bg:'#FFFFFF',text:'#003087',border:'#2E8B57'},
-  CT: {bg:'#003087',text:'#FFFFFF',border:'#003087'},
-  DE: {bg:'#FFD700',text:'#003A70',border:'#003A70'},
-  FL: {bg:'#FF8C00',text:'#003087',border:'#2E8B57'},
-  GA: {bg:'#FFFFFF',text:'#CC0000',border:'#CC0000'},
-  HI: {bg:'#003087',text:'#FFD700',border:'#003087'},
-  ID: {bg:'#2E8B57',text:'#FFFFFF',border:'#003087'},
-  IL: {bg:'#FFFFFF',text:'#003087',border:'#CC0000'},
-  IN: {bg:'#003087',text:'#FFFFFF',border:'#FFD700'},
-  IA: {bg:'#003087',text:'#FFD700',border:'#003087'},
-  KS: {bg:'#003087',text:'#FFD700',border:'#FFD700'},
-  KY: {bg:'#003087',text:'#FFFFFF',border:'#C8102E'},
-  LA: {bg:'#CC0000',text:'#FFFFFF',border:'#003087'},
-  ME: {bg:'#003087',text:'#FFFFFF',border:'#2E8B57'},
-  MD: {bg:'#CC0000',text:'#FFD700',border:'#000000'},
-  MA: {bg:'#003087',text:'#FFFFFF',border:'#2E8B57'},
-  MI: {bg:'#003087',text:'#FFFFFF',border:'#003087'},
-  MN: {bg:'#FFFFFF',text:'#003087',border:'#2E8B57'},
-  MS: {bg:'#003087',text:'#FFFFFF',border:'#CC0000'},
-  MO: {bg:'#FFFFFF',text:'#003087',border:'#CC0000'},
-  MT: {bg:'#003087',text:'#FFD700',border:'#CC0000'},
-  NE: {bg:'#CC0000',text:'#FFFFFF',border:'#003087'},
-  NV: {bg:'#003087',text:'#C0C0C0',border:'#C0C0C0'},
-  NH: {bg:'#2E8B57',text:'#FFFFFF',border:'#FFD700'},
-  NJ: {bg:'FFD700',text:'#003087',border:'#003087'},
-  NM: {bg:'#FFD700',text:'#CC0000',border:'#CC0000'},
-  NY: {bg:'#FFD700',text:'#003087',border:'#003087'},
-  NC: {bg:'#CC0000',text:'#FFFFFF',border:'#003087'},
-  ND: {bg:'#003087',text:'#FFFFFF',border:'#FFD700'},
-  OH: {bg:'#CC0000',text:'#FFFFFF',border:'#003087'},
-  OK: {bg:'#2E8B57',text:'#FFD700',border:'#CC0000'},
-  OR: {bg:'#003087',text:'#FFD700',border:'#003087'},
-  PA: {bg:'#003087',text:'#FFD700',border:'#FFD700'},
-  RI: {bg:'FFD700',text:'#003087',border:'#003087'},
-  SC: {bg:'#003087',text:'#FFFFFF',border:'#C8102E'},
-  SD: {bg:'#003087',text:'#FFD700',border:'#CC0000'},
-  TN: {bg:'#FFFFFF',text:'#FF8C00',border:'#003087'},
-  TX: {bg:'#FFFFFF',text:'#003087',border:'#003087'},
-  UT: {bg:'#FFFFFF',text:'#000000',border:'#CC0000'},
-  VT: {bg:'#2E8B57',text:'#FFFFFF',border:'#FFD700'},
-  VA: {bg:'#003087',text:'#FFFFFF',border:'#003087'},
-  WA: {bg:'#003087',text:'#2E8B57',border:'#2E8B57'},
-  WV: {bg:'#003087',text:'#FFD700',border:'#FFD700'},
-  WI: {bg:'#003087',text:'#FFFFFF',border:'#003087'},
-  WY: {bg:'#CC0000',text:'#FFD700',border:'#003087'},
-  DC: {bg:'#FFFFFF',text:'#CC0000',border:'#CC0000'},
-  AB: {bg:'#003087',text:'#FFD700',border:'#CC0000'},
-  BC: {bg:'#003087',text:'#FFFFFF',border:'#2E8B57'},
-  MB: {bg:'#003087',text:'#FFD700',border:'#003087'},
-  NB: {bg:'FFD700',text:'#CC0000',border:'#CC0000'},
-  NL: {bg:'#2E8B57',text:'#FFFFFF',border:'#003087'},
-  NS: {bg:'#003087',text:'#FFD700',border:'#003087'},
-  ON: {bg:'#003087',text:'#FFFFFF',border:'#CC0000'},
-  PE: {bg:'#CC0000',text:'#FFFFFF',border:'#FFD700'},
-  QC: {bg:'#003087',text:'#FFFFFF',border:'#FFFFFF'},
-  SK: {bg:'#2E8B57',text:'#FFD700',border:'#FFD700'},
-  US: {bg:'#002868',text:'#FFFFFF',border:'#BF0A30'},
-};
-
-function renderGrid() {
-  const grid = document.getElementById('plates-grid');
-  grid.innerHTML = '';
-  REGIONS.forEach(r => {
-    const cell = document.createElement('div');
-    const sp = gameState.spotted[r.abbr];
-    const colors = PLATE_COLORS[r.abbr] || {bg:'#FFFFFF',text:'#003087',border:'#003087'};
-    if (sp) {
-      // Spotted = greyed out
-      cell.className = 'plate-cell spotted';
-      cell.style.cssText = 'background:#D6D3CB;border-color:#B8B5AD;opacity:0.55;filter:grayscale(60%);';
-    } else {
-      // Unspotted = bold full color
-      cell.className = 'plate-cell unspotted';
-      cell.style.cssText = 'background:' + colors.bg + ';border-color:' + colors.border + ';opacity:1;font-weight:900;';
-    }
-    const abbrEl = sp
-      ? '<span class="plate-abbr" style="color:#6B6860">' + r.abbr + '</span>'
-      : '<span class="plate-abbr" style="color:' + colors.text + ';font-weight:900">' + r.abbr + '</span>';
-    const nameEl = sp
-      ? '<span class="plate-name" style="color:#6B6860">' + r.name + '</span>'
-      : '<span class="plate-name" style="color:' + colors.text + ';opacity:0.85">' + r.name + '</span>';
-    const badge = sp ? '<div class="check-badge" style="background:#6B6860;color:white">✓</div>' : '';
-    cell.innerHTML = abbrEl + nameEl + badge;
-    cell.onclick = () => quickSpot(r.abbr);
-    grid.appendChild(cell);
-  });
-}
-
-function renderLeaderboard() {
-  const lb = document.getElementById('leaderboard');
-  const players = Object.values(gameState.players).sort((a,b) => (b.points||0)-(a.points||0));
-  if (players.length === 0) {
-    lb.innerHTML = '<div class="empty-state"><div class="empty-icon">🏆</div><p>No players yet.<br>Add some in the Players tab!</p></div>';
-    return;
-  }
-  const medals = ['🥇','🥈','🥉'];
-  const ranks = ['r1','r2','r3'];
-  lb.innerHTML = '';
-
-  // Top 5 — normal ranked rows
-  const top5 = players.slice(0, 5);
-  top5.forEach((p, i) => {
-    const row = document.createElement('div');
-    row.className = 'lb-row';
-    const rankHtml = i < 3
-      ? '<span class="lb-rank ' + ranks[i] + '">' + medals[i] + '</span>'
-      : '<span class="lb-rank">' + (i + 1) + '</span>';
-    row.innerHTML = rankHtml
-      + '<span class="lb-name">' + p.name + '</span>'
-      + '<span class="lb-spots">' + (p.spotCount||0) + ' plates</span>'
-      + '<span class="lb-pts">' + (p.points||0) + ' pts</span>'
-      + '<span style="font-size:11px;color:var(--muted);margin-left:4px;">›</span>';
-    row.style.cursor = 'pointer';
-    row.onclick = () => {
-      logFilter = p.name;
-      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-      document.querySelectorAll('.panel').forEach(panel => panel.classList.remove('active'));
-      document.querySelector('[data-tab="log"]').classList.add('active');
-      document.getElementById('tab-log').classList.add('active');
-      renderFeed();
-    };
-    lb.appendChild(row);
-  });
-
-  // Beyond 5th — compact cluster, alphabetical, no rank/medal
-  const rest = players.slice(5).sort((a, b) => a.name.localeCompare(b.name));
-  if (rest.length > 0) {
-    const cluster = document.createElement('div');
-    cluster.style.cssText = 'background:var(--bg);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;margin-top:4px;display:flex;flex-wrap:wrap;gap:8px;';
-    rest.forEach(p => {
-      const chip = document.createElement('div');
-      chip.style.cssText = 'display:flex;align-items:center;gap:6px;background:var(--card);border:1px solid var(--border);border-radius:999px;padding:4px 12px;cursor:pointer;';
-      chip.innerHTML = '<span style="font-size:13px;font-weight:700;color:var(--text);">' + p.name + '</span>'
-        + '<span style="font-family:\'Fredoka One\',cursive;font-size:13px;color:var(--green-dark);">' + (p.points||0) + ' pts</span>';
-      chip.onclick = () => {
-        logFilter = p.name;
-        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-        document.querySelectorAll('.panel').forEach(panel => panel.classList.remove('active'));
-        document.querySelector('[data-tab="log"]').classList.add('active');
-        document.getElementById('tab-log').classList.add('active');
-        renderFeed();
-      };
-      cluster.appendChild(chip);
-    });
-    lb.appendChild(cluster);
-  }
-}
-
-function renderFeed() {
-  const feed = document.getElementById('feed');
-  const noLog = document.getElementById('no-log');
-  let entries = Object.values(gameState.log).sort((a,b) => b.ts - a.ts);
-  // Filter banner
-  let filterBanner = document.getElementById('log-filter-banner');
-  if (!filterBanner) {
-    filterBanner = document.createElement('div');
-    filterBanner.id = 'log-filter-banner';
-    filterBanner.style.cssText = 'display:none;background:var(--blue-light);border:1.5px solid var(--blue);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:12px;display:none;align-items:center;justify-content:space-between;';
-    feed.parentNode.insertBefore(filterBanner, feed);
-  }
-  if (logFilter) {
-    entries = entries.filter(e => e.spotter === logFilter);
-    filterBanner.style.display = 'flex';
-    filterBanner.innerHTML = '<span style="font-size:13px;font-weight:700;color:var(--blue)">📋 ' + logFilter + String.fromCharCode(39) + 's sightings</span>'
-      + '<button onclick="logFilter=null;renderFeed();" style="background:none;border:none;font-size:13px;font-weight:700;color:var(--blue);cursor:pointer;">← All Players</button>';
-  } else {
-    filterBanner.style.display = 'none';
-  }
-  feed.innerHTML = '';
-  noLog.style.display = entries.length ? 'none' : '';
-  entries.forEach(entry => {
-    const item = document.createElement('div');
-    item.className = 'feed-item';
-    const isFirst = entry.firstSpot !== false;
-    const basePts = entry.basePts || entry.pts || 0;
-    const firstBonus = entry.firstBonus || 0;
-    const ptsBreakdown = firstBonus > 0
-      ? '<span style="font-size:11px;opacity:0.7"> (' + basePts + '+' + firstBonus + ' first)</span>'
-      : '<span style="font-size:11px;opacity:0.7"> (' + basePts + ' pts)</span>';
-    item.innerHTML = '<div class="feed-abbr">' + entry.abbr + '</div>'
-      + '<div class="feed-info">'
-      + '<div class="feed-who">' + entry.spotter + (isFirst ? ' <span class="badge first">First spot!</span>' : '') + '</div>'
-      + '<div class="feed-detail">' + entry.date + (entry.loc?' · '+entry.loc:'') + (entry.notes?' · '+entry.notes:'') + '</div>'
-      + '</div>'
-      + '<div class="feed-pts">+' + entry.pts + ptsBreakdown + '</div>';
-    feed.appendChild(item);
-  });
-}
-
-
-function renderHistory() {
-  const hist = gameState.history || {};
-  const entries = Object.values(hist).sort((a,b) => b.ts - a.ts);
-  const section = document.getElementById('history-section');
-  const list = document.getElementById('history-list');
-  if (!section || !list) return;
-  if (entries.length === 0) { section.style.display = 'none'; return; }
-  section.style.display = '';
-  list.innerHTML = '';
-  const medals = ['🥇','🥈','🥉'];
-  entries.forEach(e => {
-    const card = document.createElement('div');
-    card.className = 'hist-card';
-    let html = '<div class="hist-date">' + e.date + '</div>';
-    html += '<div class="hist-plates">🗺️ ' + (e.totalPlates||0) + ' plates spotted that game</div>';
-    (e.top3||[]).forEach((p,i) => {
-      html += '<div class="hist-player"><span class="hist-medal">' + (medals[i]||'') + '</span><span class="hist-pname">' + p.name + '</span><span class="hist-ppts">' + p.points + ' pts</span></div>';
-    });
-    card.innerHTML = html;
-    list.appendChild(card);
-  });
-}
-function renderChips() {
-  const chips = document.getElementById('player-chips');
-  const players = Object.entries(gameState.players);
-  if (players.length === 0) {
-    chips.innerHTML = '<div class="empty-state" style="padding:20px;width:100%"><p>No players yet.</p></div>';
-    return;
-  }
-  chips.innerHTML = '';
-  players.forEach(([key, p]) => {
-    const chip = document.createElement('div');
-    chip.className = 'chip';
-    chip.innerHTML = p.name + '<span class="chip-del" title="Remove">×</span>';
-    chip.querySelector('.chip-del').onclick = async () => {
-      if (!confirm('Remove ' + p.name + '?')) return;
-      await remove(ref(db, 'game/players/' + key));
-    };
-    chips.appendChild(chip);
-  });
-}
-
-async function logSpot(spotter, abbr, loc, notes) {
-  const playerEntry = Object.entries(gameState.players).find(([k,p]) => p.name === spotter);
-  if (!playerEntry) { alert('Player not found!'); return; }
-  const [playerKey, player] = playerEntry;
-  const playerSpotted = player.spotted || {};
-  if (playerSpotted[abbr]) {
-    alert(spotter + ' already spotted ' + abbr + '! Someone else can still claim it.');
-    return;
-  }
-  const familyFirstSpot = !gameState.spotted[abbr];
-  const basePts = platePoints(abbr);
-  const firstBonus = familyFirstSpot ? 2 : 0;
-  const pts = basePts + firstBonus;
-  const newPoints = (player.points || 0) + pts;
-  const newSpotCount = (player.spotCount || 0) + 1;
-  const logKey = Date.now().toString();
-  const updates = {};
-  updates['game/players/' + playerKey + '/points'] = newPoints;
-  updates['game/players/' + playerKey + '/spotCount'] = newSpotCount;
-  updates['game/players/' + playerKey + '/spotted/' + abbr] = new Date().toLocaleDateString();
-  if (familyFirstSpot) updates['game/spotted/' + abbr] = { spotter, date: new Date().toLocaleDateString(), ts: Date.now() };
-  updates['game/log/' + logKey] = { abbr, spotter, loc: loc||'', notes: notes||'', pts, basePts, firstBonus, firstSpot: familyFirstSpot, date: new Date().toLocaleDateString(), ts: Date.now() };
-  const { update } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js");
-  await update(ref(db), updates);
-  if (familyFirstSpot) launchConfetti();
-}
-
-function quickSpot(abbr) {
-  const players = Object.values(gameState.players);
-  if (players.length === 0) { alert('Add players first in the Players tab!'); return; }
-  if (players.length === 1) { logSpot(players[0].name, abbr, '', ''); return; }
-  const region = REGIONS.find(r => r.abbr === abbr);
-  document.getElementById('modal-plate-abbr').textContent = abbr;
-  document.getElementById('modal-plate-name').textContent = region ? region.name : '';
-  const grid = document.getElementById('modal-player-btns');
-  grid.innerHTML = '';
-  players.forEach(p => {
-    const alreadyGot = p.spotted && p.spotted[abbr];
-    const btn = document.createElement('button');
-    btn.className = 'player-btn' + (alreadyGot ? ' already-got' : '');
-    btn.textContent = alreadyGot ? p.name + ' (got it)' : p.name;
-    btn.disabled = !!alreadyGot;
-    btn.onclick = () => {
-      closeModal();
-      logSpot(p.name, abbr, '', '');
-    };
-    grid.appendChild(btn);
-  });
-  document.getElementById('player-modal').classList.add('show');
-}
-
-function closeModal() {
-  document.getElementById('player-modal').classList.remove('show');
-}
-
-// Auto-populate location when spot tab is opened
-document.querySelectorAll('.tab').forEach(tab => {
-  if (tab.dataset.tab === 'spot') {
-    const orig = tab.onclick;
-    tab.addEventListener('click', async () => {
-      const locInput = document.getElementById('loc-in');
-      if (!locInput.value) {
-        locInput.placeholder = 'Getting location…';
-        const loc = await getLocation();
-        locInput.placeholder = loc;
-      }
-    });
-  }
-});
-
+// ── Log Sighting ──
 document.getElementById('log-btn').onclick = async () => {
   const spotter = document.getElementById('spotter-sel').value;
-  const abbr = document.getElementById('plate-sel').value;
   if (!spotter) { alert('Please select who spotted it!'); return; }
-  if (!abbr) { alert('Please select a state or province!'); return; }
+
   const locInput = document.getElementById('loc-in');
   let loc = locInput.value.trim();
   if (!loc && locInput.placeholder && locInput.placeholder !== 'e.g. I-90 near Chicago' && locInput.placeholder !== 'Getting location…') {
     loc = locInput.placeholder;
   }
   const notes = document.getElementById('notes-in').value.trim();
-  await logSpot(spotter, abbr, loc, notes);
-  document.getElementById('plate-sel').value = '';
-  locInput.value = '';
-  locInput.placeholder = 'e.g. I-90 near Chicago';
-  document.getElementById('notes-in').value = '';
+
+  if (spotSession) {
+    // Session-based log
+    const { abbr } = spotSession;
+    const success = await logSpot(spotter, abbr, loc, notes);
+    if (success) {
+      // Lock location after first log
+      if (spotSession.lockedLoc === null) spotSession.lockedLoc = loc;
+      spotSession.loggedSpotters.push(spotter);
+      // Clear only spotter and notes
+      document.getElementById('notes-in').value = '';
+      updateSpotPanel();
+    }
+  } else {
+    // Fallback: no session (shouldn't happen but keep safe)
+    const abbr = document.getElementById('plate-sel')?.value;
+    if (!abbr) { alert('Please select a state or province!'); return; }
+    await logSpot(spotter, abbr, loc, notes);
+    document.getElementById('loc-in').value = '';
+    document.getElementById('loc-in').placeholder = 'e.g. I-90 near Chicago';
+    document.getElementById('notes-in').value = '';
+  }
 };
 
+// Done button → back to All Plates
+document.getElementById('spot-done-btn').onclick = () => {
+  spotSession = null;
+  // Reset spot panel
+  document.getElementById('loc-in').value = '';
+  document.getElementById('loc-in').readOnly = false;
+  document.getElementById('loc-in').style.opacity = '1';
+  document.getElementById('loc-in').placeholder = 'e.g. I-90 near Chicago';
+  document.getElementById('notes-in').value = '';
+  document.getElementById('spot-session-header').style.display = 'none';
+  document.getElementById('spot-context-banner').className = 'spot-context-banner';
+  document.getElementById('spot-done-btn').style.display = 'none';
+  document.getElementById('log-btn').textContent = 'Log Sighting 🎯';
+  document.getElementById('loc-label').style.display = 'none';
+  document.getElementById('loc-label-free').style.display = 'block';
+  switchTab('plates');
+};
+
+// ── logSpot core ──
+async function logSpot(spotter, abbr, loc, notes) {
+  const playerEntry = Object.entries(gameState.players).find(([k,p])=>p.name===spotter);
+  if (!playerEntry) { alert('Player not found!'); return false; }
+  const [playerKey, player] = playerEntry;
+  if (player.spotted && player.spotted[abbr]) {
+    alert(spotter + ' already spotted ' + abbr + '!'); return false;
+  }
+  const familyFirstSpot = !gameState.spotted[abbr];
+  const basePts = platePoints(abbr);
+  const firstBonus = familyFirstSpot ? 2 : 0;
+  const pts = basePts + firstBonus;
+  const logKey = Date.now().toString();
+  const updates = {};
+  updates['game/players/'+playerKey+'/points'] = (player.points||0)+pts;
+  updates['game/players/'+playerKey+'/spotCount'] = (player.spotCount||0)+1;
+  updates['game/players/'+playerKey+'/spotted/'+abbr] = new Date().toLocaleDateString();
+  if (familyFirstSpot) updates['game/spotted/'+abbr] = { spotter, date: new Date().toLocaleDateString(), ts: Date.now() };
+  updates['game/log/'+logKey] = { abbr, spotter, loc:loc||'', notes:notes||'', pts, basePts, firstBonus, firstSpot:familyFirstSpot, date:new Date().toLocaleDateString(), ts:Date.now() };
+  const { update } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js");
+  await update(ref(db), updates);
+  if (familyFirstSpot) launchConfetti();
+  return true;
+}
+
+// ── Leaderboard ──
+function renderLeaderboard() {
+  const lb = document.getElementById('leaderboard');
+  const players = Object.values(gameState.players).sort((a,b)=>(b.points||0)-(a.points||0));
+  if (players.length===0) {
+    lb.innerHTML='<div class="empty-state"><div class="empty-icon">🏆</div><p>No players yet.<br>Add some in the Players tab!</p></div>';
+    return;
+  }
+  const medals=['🥇','🥈','🥉'],ranks=['r1','r2','r3'];
+  lb.innerHTML='';
+  players.slice(0,5).forEach((p,i)=>{
+    const row=document.createElement('div');
+    row.className='lb-row';
+    const rankHtml=i<3?'<span class="lb-rank '+ranks[i]+'">'+medals[i]+'</span>':'<span class="lb-rank">'+(i+1)+'</span>';
+    row.innerHTML=rankHtml+'<span class="lb-name">'+p.name+'</span><span class="lb-spots">'+(p.spotCount||0)+' plates</span><span class="lb-pts">'+(p.points||0)+' pts</span><span style="font-size:11px;color:var(--muted);margin-left:4px;">›</span>';
+    row.style.cursor='pointer';
+    row.onclick=()=>{ logFilter=p.name; switchTab('log'); renderFeed(); };
+    lb.appendChild(row);
+  });
+  const rest=players.slice(5).sort((a,b)=>a.name.localeCompare(b.name));
+  if (rest.length>0) {
+    const cluster=document.createElement('div');
+    cluster.style.cssText='background:var(--bg);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;margin-top:4px;display:flex;flex-wrap:wrap;gap:8px;';
+    rest.forEach(p=>{
+      const chip=document.createElement('div');
+      chip.style.cssText='display:flex;align-items:center;gap:6px;background:var(--card);border:1px solid var(--border);border-radius:999px;padding:4px 12px;cursor:pointer;';
+      chip.innerHTML='<span style="font-size:13px;font-weight:700;color:var(--text);">'+p.name+'</span><span style="font-family:\'Fredoka One\',cursive;font-size:13px;color:var(--green-dark);">'+(p.points||0)+' pts</span>';
+      chip.onclick=()=>{ logFilter=p.name; switchTab('log'); renderFeed(); };
+      cluster.appendChild(chip);
+    });
+    lb.appendChild(cluster);
+  }
+}
+
+// ── Feed / Log ──
+const UNDO_WINDOW_MS = 3 * 60 * 60 * 1000; // 3 hours
+
+function renderFeed() {
+  const feed = document.getElementById('feed');
+  const noLog = document.getElementById('no-log');
+  let entries = Object.entries(gameState.log)
+    .map(([key, val]) => ({...val, _key: key}))
+    .sort((a,b)=>b.ts-a.ts);
+
+  // Filter banner
+  let filterBanner = document.getElementById('log-filter-banner');
+  if (!filterBanner) {
+    filterBanner = document.createElement('div');
+    filterBanner.id = 'log-filter-banner';
+    filterBanner.style.cssText = 'display:none;background:var(--blue-light);border:1.5px solid var(--blue);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:12px;align-items:center;justify-content:space-between;';
+    feed.parentNode.insertBefore(filterBanner, feed);
+  }
+  if (logFilter) {
+    entries = entries.filter(e=>e.spotter===logFilter);
+    filterBanner.style.display = 'flex';
+    filterBanner.innerHTML = '<span style="font-size:13px;font-weight:700;color:var(--blue)">📋 '+logFilter+'\'s sightings</span>'
+      +'<button onclick="logFilter=null;renderFeed();" style="background:none;border:none;font-size:13px;font-weight:700;color:var(--blue);cursor:pointer;">← All Players</button>';
+  } else {
+    filterBanner.style.display = 'none';
+  }
+
+  feed.innerHTML = '';
+  noLog.style.display = entries.length ? 'none' : '';
+
+  const now = Date.now();
+  entries.forEach(entry => {
+    const item = document.createElement('div');
+    item.className = 'feed-item';
+    const isUndo = !!entry.isUndo;
+    const isFirst = !isUndo && entry.firstSpot !== false;
+    const basePts = entry.basePts || entry.pts || 0;
+    const firstBonus = entry.firstBonus || 0;
+    const ptsBreakdown = firstBonus > 0
+      ? '<span style="font-size:11px;opacity:0.7"> ('+basePts+'+'+firstBonus+' first)</span>'
+      : '<span style="font-size:11px;opacity:0.7"> ('+basePts+' pts)</span>';
+
+    const abbrClass = isUndo ? 'feed-abbr undone' : 'feed-abbr';
+    const ptsClass = isUndo ? 'feed-pts undone' : 'feed-pts';
+    const ptsText = isUndo ? '↩ undone' : '+'+entry.pts+ptsBreakdown;
+
+    item.innerHTML = '<div class="'+abbrClass+'">'+entry.abbr+'</div>'
+      +'<div class="feed-info">'
+      +'<div class="feed-who">'+entry.spotter+(isFirst?' <span class="badge first">First spot!</span>':'')+'</div>'
+      +'<div class="feed-detail">'+entry.date+(entry.loc?' · '+entry.loc:'')+(entry.notes?' · '+entry.notes:'')+(isUndo?' · logged in error':'')+'</div>'
+      +'</div>'
+      +'<div class="'+ptsClass+'">'+ptsText+'</div>';
+
+    // Undo button: only for non-undo entries within 3h window
+    if (!isUndo && (now - entry.ts) < UNDO_WINDOW_MS) {
+      const undoBtn = document.createElement('button');
+      undoBtn.className = 'feed-undo-btn';
+      undoBtn.title = 'Undo this entry';
+      undoBtn.textContent = '🗑️';
+      undoBtn.onclick = () => confirmUndo(entry);
+      item.appendChild(undoBtn);
+    }
+
+    feed.appendChild(item);
+  });
+}
+
+async function confirmUndo(entry) {
+  if (!confirm('Undo ' + entry.spotter + '\'s ' + entry.abbr + ' sighting? This will reverse their points.')) return;
+  await doUndo(entry);
+}
+
+async function doUndo(entry) {
+  const { update } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js");
+  const { remove: dbRemove } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js");
+
+  const playerEntry = Object.entries(gameState.players).find(([k,p])=>p.name===entry.spotter);
+  if (!playerEntry) { alert('Player not found for undo.'); return; }
+  const [playerKey, player] = playerEntry;
+
+  const updates = {};
+  // Reverse points and spotCount
+  updates['game/players/'+playerKey+'/points'] = Math.max(0, (player.points||0) - entry.pts);
+  updates['game/players/'+playerKey+'/spotCount'] = Math.max(0, (player.spotCount||0) - 1);
+
+  // Remove from player's spotted
+  updates['game/players/'+playerKey+'/spotted/'+entry.abbr] = null;
+
+  // Check if any OTHER player has spotted this plate
+  const otherPlayerHasIt = Object.entries(gameState.players)
+    .filter(([k,p])=>p.name !== entry.spotter)
+    .some(([k,p])=>p.spotted && p.spotted[entry.abbr]);
+
+  // If no one else has it, remove from family spotted
+  if (!otherPlayerHasIt) {
+    updates['game/spotted/'+entry.abbr] = null;
+  }
+
+  // Remove original log entry
+  updates['game/log/'+entry._key] = null;
+
+  // Write undo log entry
+  const undoKey = (Date.now()+1).toString();
+  updates['game/log/'+undoKey] = {
+    abbr: entry.abbr,
+    spotter: entry.spotter,
+    loc: entry.loc||'',
+    notes: '',
+    pts: 0,
+    basePts: 0,
+    firstBonus: 0,
+    firstSpot: false,
+    isUndo: true,
+    date: new Date().toLocaleDateString(),
+    ts: Date.now()
+  };
+
+  await update(ref(db), updates);
+}
+
+// ── History ──
+function renderHistory() {
+  const hist = gameState.history||{};
+  const entries = Object.values(hist).sort((a,b)=>b.ts-a.ts);
+  const section = document.getElementById('history-section');
+  const list = document.getElementById('history-list');
+  if (!section||!list) return;
+  if (entries.length===0) { section.style.display='none'; return; }
+  section.style.display='';
+  list.innerHTML='';
+  const medals=['🥇','🥈','🥉'];
+  entries.forEach(e=>{
+    const card=document.createElement('div');
+    card.className='hist-card';
+    let html='<div class="hist-date">'+e.date+'</div>';
+    html+='<div class="hist-plates">🗺️ '+(e.totalPlates||0)+' plates spotted that game</div>';
+    (e.top3||[]).forEach((p,i)=>{
+      html+='<div class="hist-player"><span class="hist-medal">'+(medals[i]||'')+'</span><span class="hist-pname">'+p.name+'</span><span class="hist-ppts">'+p.points+' pts</span></div>';
+    });
+    card.innerHTML=html;
+    list.appendChild(card);
+  });
+}
+
+// ── Player chips (settings) ──
+function renderChips() {
+  const chips = document.getElementById('player-chips');
+  const players = Object.entries(gameState.players);
+  if (players.length===0) {
+    chips.innerHTML='<div class="empty-state" style="padding:20px;width:100%"><p>No players yet.</p></div>';
+    return;
+  }
+  chips.innerHTML='';
+  players.forEach(([key,p])=>{
+    const chip=document.createElement('div');
+    chip.className='chip';
+    chip.innerHTML=p.name+'<span class="chip-del" title="Remove">×</span>';
+    chip.querySelector('.chip-del').onclick=async()=>{
+      if (!confirm('Remove '+p.name+'?')) return;
+      await remove(ref(db,'game/players/'+key));
+    };
+    chips.appendChild(chip);
+  });
+}
+
+// ── Add player ──
 document.getElementById('add-player-btn').onclick = async () => {
   const name = document.getElementById('new-player').value.trim();
   if (!name) return;
-  const existing = Object.values(gameState.players).find(p => p.name.toLowerCase() === name.toLowerCase());
+  const existing = Object.values(gameState.players).find(p=>p.name.toLowerCase()===name.toLowerCase());
   if (existing) { alert('Player already added!'); return; }
-  await push(ref(db, 'game/players'), { name, points: 0, spotCount: 0 });
-  document.getElementById('new-player').value = '';
+  await push(ref(db,'game/players'),{name,points:0,spotCount:0});
+  document.getElementById('new-player').value='';
 };
-document.getElementById('new-player').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('add-player-btn').click(); });
+document.getElementById('new-player').addEventListener('keydown',e=>{ if(e.key==='Enter') document.getElementById('add-player-btn').click(); });
 
-document.getElementById('modal-cancel').onclick = closeModal;
-document.getElementById('player-modal').onclick = (e) => { if (e.target.id === 'player-modal') closeModal(); };
-
-async function doReset() {
-  const { update } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js");
-  // Save history first
-  const players = Object.values(gameState.players).sort((a,b)=>(b.points||0)-(a.points||0));
-  const top3 = players.slice(0,3).map(p=>({name:p.name,points:p.points||0,spotCount:p.spotCount||0}));
-  const histEntry = { date: new Date().toLocaleDateString(), top3, totalPlates: Object.keys(gameState.spotted).length, ts: Date.now() };
-  // Reset players with IL freebie pts
-  const ilPts = platePoints('IL');
-  const resetPlayers = {};
-  Object.entries(gameState.players).forEach(([k,p]) => {
-    resetPlayers[k] = { name: p.name, points: ilPts, spotCount: 1, spotted: { IL: new Date().toLocaleDateString() } };
-  });
-  const logKey = (Date.now()).toString();
-  const ilLog = { abbr:'IL', spotter:'Everyone', loc:'Home base 🏠', notes:'Freebie!', pts: ilPts, basePts: ilPts, firstBonus:0, firstSpot:true, date: new Date().toLocaleDateString(), ts: Date.now() };
-  await update(ref(db), {
-    'game/spotted': { IL: { spotter:'Everyone', date: new Date().toLocaleDateString() } },
-    'game/log': { [logKey]: ilLog },
-    'game/players': resetPlayers,
-    'game/startedAt': Date.now(),
-    ['history/' + Date.now()]: histEntry
-  });
-  launchConfetti();
-  setTimeout(() => {
-    const banner = document.createElement('div');
-    banner.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#1C1C1A;color:white;padding:24px 28px;border-radius:16px;z-index:9999;text-align:center;font-family:Fredoka One,cursive;font-size:18px;max-width:280px;line-height:1.5;box-shadow:0 8px 32px rgba(0,0,0,0.4)';
-    banner.innerHTML = '🎉 Fresh game started!<br><span style="font-size:14px;font-family:Nunito,sans-serif;opacity:0.8">Illinois is a freebie — everyone starts with ' + ilPts + ' pts 🏠</span>';
-    document.body.appendChild(banner);
-    setTimeout(() => banner.remove(), 4000);
-  }, 300);
-}
-
-
+// ── Deadline ──
 document.getElementById('set-deadline-btn').onclick = async () => {
   const val = document.getElementById('deadline-input').value;
   if (!val) { alert('Please pick a date.'); return; }
-  const chosen = new Date(val + 'T00:00:00');
-  const minDate = new Date(Date.now() + 7 * 86400000);
-  if (chosen < minDate) { alert('Deadline must be at least 7 days from today.'); return; }
-  // Set to midnight
+  const chosen = new Date(val+'T00:00:00');
+  if (chosen < new Date(Date.now()+7*86400000)) { alert('Deadline must be at least 7 days from today.'); return; }
   chosen.setHours(0,0,0,0);
   const { update } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js");
-  await update(ref(db), { 'game/deadline': chosen.getTime() });
-  alert('Deadline set for midnight on ' + chosen.toLocaleDateString() + '!');
+  await update(ref(db),{'game/deadline':chosen.getTime()});
+  alert('Deadline set for midnight on '+chosen.toLocaleDateString()+'!');
 };
-// Manual reset removed — game resets automatically at deadline midnight
 
-document.querySelectorAll('.tab').forEach(tab => {
-  tab.onclick = () => {
-    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-    tab.classList.add('active');
-    document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
-    if (tab.dataset.tab === 'log') { logFilter = null; renderFeed(); }
-  };
-});
+// ── Reset ──
+async function doReset() {
+  const { update } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js");
+  const players = Object.values(gameState.players).sort((a,b)=>(b.points||0)-(a.points||0));
+  const top3 = players.slice(0,3).map(p=>({name:p.name,points:p.points||0,spotCount:p.spotCount||0}));
+  const histEntry = { date:new Date().toLocaleDateString(), top3, totalPlates:Object.keys(gameState.spotted).length, ts:Date.now() };
+  const ilPts = platePoints('IL');
+  const resetPlayers = {};
+  Object.entries(gameState.players).forEach(([k,p])=>{
+    resetPlayers[k]={name:p.name,points:ilPts,spotCount:1,spotted:{IL:new Date().toLocaleDateString()}};
+  });
+  const logKey = Date.now().toString();
+  const ilLog = {abbr:'IL',spotter:'Everyone',loc:'Home base 🏠',notes:'Freebie!',pts:ilPts,basePts:ilPts,firstBonus:0,firstSpot:true,date:new Date().toLocaleDateString(),ts:Date.now()};
+  await update(ref(db),{
+    'game/spotted':{IL:{spotter:'Everyone',date:new Date().toLocaleDateString()}},
+    'game/log':{[logKey]:ilLog},
+    'game/players':resetPlayers,
+    'game/startedAt':Date.now(),
+    ['history/'+Date.now()]:histEntry
+  });
+  launchConfetti();
+  setTimeout(()=>{
+    const banner=document.createElement('div');
+    banner.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#1C1C1A;color:white;padding:24px 28px;border-radius:16px;z-index:9999;text-align:center;font-family:Fredoka One,cursive;font-size:18px;max-width:280px;line-height:1.5;box-shadow:0 8px 32px rgba(0,0,0,0.4)';
+    banner.innerHTML='🎉 Fresh game started!<br><span style="font-size:14px;font-family:Nunito,sans-serif;opacity:0.8">Illinois is a freebie — everyone starts with '+ilPts+' pts 🏠</span>';
+    document.body.appendChild(banner);
+    setTimeout(()=>banner.remove(),4000);
+  },300);
+}
 
+// ── Confetti ──
 function launchConfetti() {
-  const canvas = document.getElementById('confetti');
-  const ctx = canvas.getContext('2d');
-  canvas.width = window.innerWidth; canvas.height = window.innerHeight;
-  const colors = ['#1D9E75','#378ADD','#D85A30','#D4537E','#EF9F27','#ffffff'];
-  const pieces = Array.from({length:100}, () => ({
-    x: Math.random()*canvas.width, y: -20,
-    vx: (Math.random()-0.5)*5, vy: Math.random()*4+3,
-    color: colors[Math.floor(Math.random()*colors.length)],
-    w: Math.random()*8+4, h: Math.random()*12+6,
-    spin: (Math.random()-0.5)*0.3, rot: Math.random()*Math.PI*2
+  const canvas=document.getElementById('confetti');
+  const ctx=canvas.getContext('2d');
+  canvas.width=window.innerWidth; canvas.height=window.innerHeight;
+  const colors=['#1D9E75','#378ADD','#D85A30','#D4537E','#EF9F27','#ffffff'];
+  const pieces=Array.from({length:100},()=>({
+    x:Math.random()*canvas.width,y:-20,
+    vx:(Math.random()-0.5)*5,vy:Math.random()*4+3,
+    color:colors[Math.floor(Math.random()*colors.length)],
+    w:Math.random()*8+4,h:Math.random()*12+6,
+    spin:(Math.random()-0.5)*0.3,rot:Math.random()*Math.PI*2
   }));
-  let frame = 0;
+  let frame=0;
   function draw() {
     ctx.clearRect(0,0,canvas.width,canvas.height);
-    pieces.forEach(p => {
-      ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.rot);
-      ctx.fillStyle = p.color; ctx.fillRect(-p.w/2,-p.h/2,p.w,p.h);
+    pieces.forEach(p=>{
+      ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.rot);
+      ctx.fillStyle=p.color;ctx.fillRect(-p.w/2,-p.h/2,p.w,p.h);
       ctx.restore();
-      p.x+=p.vx; p.y+=p.vy; p.vy+=0.1; p.rot+=p.spin;
+      p.x+=p.vx;p.y+=p.vy;p.vy+=0.1;p.rot+=p.spin;
     });
     frame++;
-    if (frame < 100) requestAnimationFrame(draw);
+    if(frame<100) requestAnimationFrame(draw);
     else ctx.clearRect(0,0,canvas.width,canvas.height);
   }
   draw();
 }
 
-setTimeout(() => {
-  if (document.getElementById('loading') && !document.getElementById('loading').classList.contains('hide')) {
+// Timeout fallback for loading
+setTimeout(()=>{
+  if(document.getElementById('loading')&&!document.getElementById('loading').classList.contains('hide')){
     document.getElementById('loading').classList.add('hide');
     setConnected(false);
   }
-}, 8000);
+},8000);
 
+
+// ══════════════════════════════════════════════
+// MAP — accurate SVG paths (viewBox 0 0 960 720)
+// US states + Canadian southern provinces
+// Canada fades out toward the top via gradient mask
+// ══════════════════════════════════════════════
+
+function mapFill(status) {
+  return status==='new'?'#E8A020':status==='old'?'#1B4F8A':'#D6D3CB';
+}
+function mapStroke(status) {
+  return status==='new'?'#B86800':status==='old'?'#0D2E52':'#B8B5AD';
+}
+function mapText(status) {
+  return status!=='none'?'#FFFFFF':'#7A7870';
+}
+
+function getSpotStatus(abbr) {
+  const entry = gameState.spotted[abbr];
+  if (!entry) return 'none';
+  const age = Date.now() - (entry.ts||0);
+  return age < 86400000 ? 'new' : 'old';
+}
+
+function renderMap() {
+  const svg = document.getElementById('us-map-svg');
+  if (!svg) return;
+
+  // Define gradient for Canada fade
+  let defs = `<defs>
+    <linearGradient id="canada-fade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#F7F6F2" stop-opacity="1"/>
+      <stop offset="55%" stop-color="#F7F6F2" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#F7F6F2" stop-opacity="0"/>
+    </linearGradient>
+    <mask id="canada-mask">
+      <rect x="0" y="0" width="960" height="300" fill="url(#canada-fade)"/>
+    </mask>
+    <filter id="ds"><feDropShadow dx="0" dy="1" stdDeviation="1.2" flood-color="rgba(0,0,0,0.18)"/></filter>
+  </defs>`;
+
+  // ── US STATE PATHS (accurate, viewBox 960x720, states roughly y:220–720) ──
+  const US_PATHS = {
+    // West
+    WA: "M 152,164 L 152,222 L 232,222 L 242,206 L 258,207 L 260,178 L 252,156 L 220,148 L 196,148 L 168,154 Z",
+    OR: "M 152,222 L 152,320 L 238,328 L 256,314 L 268,280 L 260,222 L 242,206 L 232,222 Z",
+    CA: "M 116,326 L 152,320 L 152,222 L 120,234 L 104,268 L 96,304 L 90,352 L 100,400 L 116,426 L 140,452 L 152,472 L 136,488 L 132,510 L 152,530 L 152,556 L 134,582 L 120,596 Z",
+    ID: "M 260,178 L 258,208 L 296,230 L 320,230 L 326,188 L 322,164 L 296,160 L 278,160 Z",
+    NV: "M 152,320 L 238,328 L 268,280 L 296,230 L 258,208 L 242,206 L 232,222 L 152,222 Z M 152,320 L 238,328 L 240,400 L 224,448 L 196,452 L 172,422 L 152,408 Z",
+    UT: "M 238,328 L 320,328 L 320,428 L 240,428 L 224,448 L 240,400 Z",
+    AZ: "M 196,452 L 224,448 L 240,428 L 320,428 L 318,536 L 290,536 L 254,536 L 208,538 L 196,506 Z",
+    MT: "M 260,178 L 296,160 L 322,164 L 326,188 L 488,180 L 488,130 L 390,120 L 330,108 L 296,108 L 270,120 Z",
+    WY: "M 296,230 L 326,188 L 488,180 L 490,286 L 320,290 L 320,230 Z",
+    CO: "M 320,290 L 490,286 L 494,382 L 322,382 L 320,328 Z",
+    NM: "M 322,382 L 494,382 L 496,480 L 430,480 L 430,512 L 318,512 L 318,480 Z",
+    // Great Plains
+    ND: "M 488,130 L 488,180 L 636,174 L 640,120 L 598,110 L 548,108 L 510,112 Z",
+    SD: "M 488,180 L 490,286 L 638,284 L 636,174 Z",
+    NE: "M 490,286 L 494,358 L 642,356 L 638,284 Z",
+    KS: "M 494,358 L 494,420 L 644,418 L 642,356 Z",
+    OK: "M 494,420 L 494,456 L 538,456 L 538,476 L 646,476 L 644,418 Z",
+    TX: "M 430,480 L 430,512 L 496,480 L 538,476 L 538,456 L 494,456 L 494,500 L 476,524 L 476,564 L 494,590 L 516,614 L 556,634 L 594,634 L 616,618 L 638,596 L 638,558 L 660,542 L 674,512 L 680,478 L 680,440 L 646,476 Z",
+    // Midwest
+    MN: "M 636,174 L 638,284 L 676,290 L 700,264 L 716,238 L 716,184 L 690,168 L 660,152 L 640,120 Z",
+    IA: "M 638,284 L 642,356 L 710,354 L 718,320 L 718,298 L 700,264 L 676,290 Z",
+    MO: "M 642,356 L 644,418 L 646,476 L 680,478 L 700,468 L 718,458 L 718,408 L 726,390 L 714,362 L 710,354 Z",
+    AR: "M 644,418 L 646,476 L 680,478 L 700,468 L 718,458 L 718,514 L 680,516 L 660,516 L 644,514 Z",
+    LA: "M 644,514 L 660,516 L 680,516 L 718,514 L 720,558 L 706,572 L 690,572 L 672,564 L 658,556 L 648,542 Z",
+    WI: "M 676,290 L 700,264 L 716,238 L 730,238 L 744,220 L 758,228 L 766,254 L 760,282 L 746,294 L 726,298 L 718,298 L 718,320 Z",
+    IL: "M 710,354 L 718,320 L 718,298 L 726,298 L 746,294 L 752,336 L 748,376 L 740,400 L 726,408 L 718,408 L 718,362 Z",
+    MI_lower: "M 730,238 L 744,220 L 762,204 L 778,200 L 790,206 L 794,220 L 786,240 L 776,252 L 758,258 L 744,256 L 744,238 Z",
+    IN: "M 746,294 L 760,282 L 776,280 L 790,298 L 790,356 L 778,376 L 760,376 L 748,376 L 752,336 Z",
+    OH: "M 776,252 L 790,206 L 810,210 L 826,224 L 832,250 L 828,290 L 816,318 L 800,330 L 790,330 L 790,298 L 776,280 L 760,282 Z",
+    KY: "M 748,376 L 778,376 L 790,356 L 800,330 L 816,318 L 828,350 L 820,370 L 812,382 L 780,398 L 764,402 L 748,404 L 740,400 Z",
+    TN: "M 718,458 L 740,448 L 748,404 L 764,402 L 780,398 L 812,382 L 820,370 L 826,396 L 826,416 L 800,432 L 780,442 L 756,450 L 730,456 Z",
+    MS: "M 700,468 L 718,458 L 730,456 L 726,508 L 718,514 L 680,516 L 680,478 Z",
+    AL: "M 730,456 L 756,450 L 768,458 L 768,514 L 760,534 L 752,534 L 730,520 L 726,508 Z",
+    GA: "M 780,442 L 800,432 L 814,440 L 820,464 L 820,510 L 810,534 L 800,542 L 782,540 L 768,530 L 768,514 L 768,458 L 756,450 Z",
+    FL: "M 768,530 L 782,540 L 800,542 L 808,558 L 814,578 L 818,614 L 812,648 L 800,666 L 784,672 L 770,664 L 756,648 L 750,626 L 748,598 L 756,574 L 752,552 L 758,534 L 760,534 Z",
+    SC: "M 800,432 L 826,416 L 836,424 L 848,434 L 852,454 L 840,466 L 824,474 L 814,468 L 814,440 Z",
+    NC: "M 790,396 L 812,382 L 828,388 L 840,396 L 852,404 L 860,418 L 854,434 L 848,434 L 836,424 L 826,416 L 826,396 L 820,370 Z",
+    VA: "M 790,356 L 800,330 L 828,338 L 844,346 L 854,360 L 852,376 L 840,386 L 828,388 L 812,382 L 800,370 L 790,370 Z",
+    // Northeast
+    WV: "M 790,356 L 790,370 L 800,370 L 812,382 L 828,388 L 840,386 L 836,360 L 826,350 L 816,318 L 800,330 Z",
+    PA: "M 790,298 L 800,330 L 816,318 L 828,290 L 832,264 L 828,256 L 810,248 L 790,244 L 778,248 L 778,270 Z",
+    NY: "M 778,200 L 794,194 L 826,198 L 848,204 L 858,216 L 856,238 L 840,250 L 828,256 L 832,264 L 810,248 L 790,244 L 778,248 L 774,226 Z",
+    MD: "M 828,338 L 844,346 L 852,336 L 848,318 L 836,316 L 828,318 L 828,330 L 836,336 Z",
+    DE: "M 844,290 L 852,286 L 856,304 L 850,318 L 844,316 L 840,302 Z",
+    NJ: "M 848,256 L 856,258 L 862,272 L 860,290 L 852,298 L 844,290 L 840,272 L 840,250 L 848,250 Z",
+    CT: "M 868,236 L 878,234 L 882,248 L 876,260 L 862,260 L 858,248 L 862,238 Z",
+    RI: "M 878,232 L 886,232 L 888,246 L 882,250 L 878,244 Z",
+    MA: "M 856,218 L 878,214 L 892,218 L 894,230 L 886,234 L 878,232 L 868,236 L 862,238 L 858,228 Z",
+    VT: "M 858,194 L 866,192 L 870,216 L 862,218 L 856,218 L 854,204 Z",
+    NH: "M 866,192 L 876,188 L 880,216 L 874,218 L 870,216 Z",
+    ME: "M 876,188 L 900,178 L 912,160 L 920,150 L 920,180 L 910,206 L 900,218 L 890,222 L 880,216 Z",
+    DC: "M 832,338 L 838,336 L 840,342 L 836,344 Z",
+  };
+
+  // Centroid label positions for US states
+  const US_LABELS = {
+    WA:{x:196,y:194}, OR:{x:196,y:274}, CA:{x:128,y:410}, ID:{x:292,y:200},
+    NV:{x:200,y:366}, UT:{x:280,y:376}, AZ:{x:254,y:484}, MT:{x:378,y:148},
+    WY:{x:390,y:238}, CO:{x:408,y:334}, NM:{x:406,y:448}, ND:{x:560,y:154},
+    SD:{x:560,y:232}, NE:{x:562,y:320}, KS:{x:566,y:388}, OK:{x:568,y:446},
+    TX:{x:568,y:548}, MN:{x:670,y:220}, IA:{x:672,y:318}, MO:{x:676,y:416},
+    AR:{x:678,y:492}, LA:{x:676,y:542}, WI:{x:722,y:264}, IL:{x:728,y:350},
+    IN:{x:766,y:334}, OH:{x:804,y:274}, KY:{x:780,y:388}, TN:{x:770,y:426},
+    MS:{x:696,y:492}, AL:{x:748,y:492}, GA:{x:784,y:490}, FL:{x:780,y:610},
+    SC:{x:826,y:450}, NC:{x:824,y:406}, VA:{x:818,y:362}, WV:{x:808,y:354},
+    PA:{x:806,y:276}, NY:{x:818,y:228}, ME:{x:898,y:188},
+    // Small states handled in ref panel: CT DE MA MD NJ NH RI VT DC
+  };
+
+  const REF_ONLY_US = new Set(['CT','DE','MA','MD','NJ','NH','RI','VT','DC','MI_lower']);
+
+  // ── CANADIAN PROVINCE PATHS (southern portions only, y:0–200 roughly) ──
+  // These are drawn behind the fade mask
+  const CA_PATHS = {
+    BC:  "M 90,160 L 90,80  L 130,50  L 152,20  L 152,222 L 120,234 L 116,200 Z",
+    AB:  "M 152,20  L 200,10  L 240,10  L 260,30  L 260,178 L 220,148 L 168,154 L 152,164 Z",
+    SK:  "M 260,30  L 320,22  L 380,18  L 390,120 L 330,108 L 296,108 L 270,120 L 260,178 Z",
+    MB:  "M 380,18  L 480,14  L 488,130 L 390,120 Z",
+    ON:  "M 480,14  L 636,8   L 640,120 L 598,110 L 548,108 L 488,130 Z",
+    QC:  "M 636,8   L 760,4   L 780,30  L 800,80  L 820,120 L 810,148 L 790,160 L 760,166 L 716,184 L 690,168 L 660,152 L 640,120 Z",
+    NB:  "M 870,120 L 900,100 L 920,120 L 910,150 L 890,160 L 870,150 Z",
+    NS:  "M 890,160 L 920,152 L 930,168 L 914,178 L 898,174 Z",
+  };
+
+  const CA_LABELS = {
+    BC:{x:118,y:140}, AB:{x:206,y:100}, SK:{x:324,y:80},
+    MB:{x:434,y:80},  ON:{x:560,y:70},  QC:{x:720,y:80},
+    NB:{x:893,y:136}, NS:{x:909,y:170},
+  };
+
+  let svgContent = defs;
+
+  // Draw Canada group with fade mask
+  svgContent += '<g mask="url(#canada-mask)">';
+  Object.entries(CA_PATHS).forEach(([abbr, path]) => {
+    const status = getSpotStatus(abbr);
+    svgContent += `<path d="${path}" fill="${mapFill(status)}" stroke="${mapStroke(status)}" stroke-width="0.8" stroke-linejoin="round"/>`;
+  });
+  // Canada labels (also faded)
+  Object.entries(CA_LABELS).forEach(([abbr, pos]) => {
+    const status = getSpotStatus(abbr);
+    svgContent += `<text x="${pos.x}" y="${pos.y+4}" text-anchor="middle" font-family="Fredoka One,cursive" font-size="11" fill="${mapText(status)}" opacity="0.85" pointer-events="none">${abbr}</text>`;
+  });
+  svgContent += '</g>';
+
+  // Draw US states
+  Object.entries(US_PATHS).forEach(([abbr, path]) => {
+    if (abbr === 'MI_lower') abbr = 'MI';
+    const status = getSpotStatus(abbr);
+    const isClickable = !REF_ONLY_US.has(abbr) && abbr !== 'DC';
+    svgContent += `<path d="${path}" fill="${mapFill(status)}" stroke="white" stroke-width="1" stroke-linejoin="round" filter="url(#ds)"${isClickable?' style="cursor:pointer"' : ''} data-abbr="${abbr}"/>`;
+  });
+
+  // US state labels
+  Object.entries(US_LABELS).forEach(([abbr, pos]) => {
+    const status = getSpotStatus(abbr);
+    svgContent += `<text x="${pos.x}" y="${pos.y+4}" text-anchor="middle" font-family="Fredoka One,cursive" font-size="10" fill="${mapText(status)}" pointer-events="none">${abbr}</text>`;
+  });
+
+  // Alaska & Hawaii insets (bottom-left corner)
+  const AK_status = getSpotStatus('AK');
+  const HI_status = getSpotStatus('HI');
+  svgContent += `<g transform="translate(60,590) scale(0.35)">
+    <rect x="-4" y="-4" width="188" height="108" rx="6" fill="white" opacity="0.5"/>
+    <path d="M 10,60 L 40,30 L 80,20 L 120,30 L 150,60 L 140,90 L 100,95 L 60,90 Z" fill="${mapFill(AK_status)}" stroke="white" stroke-width="2"/>
+    <text x="80" y="62" text-anchor="middle" font-family="Fredoka One,cursive" font-size="22" fill="${mapText(AK_status)}">AK</text>
+  </g>`;
+  svgContent += `<g transform="translate(140,606) scale(0.35)">
+    <path d="M 10,40 L 50,20 L 80,30 L 60,60 L 20,60 Z" fill="${mapFill(HI_status)}" stroke="white" stroke-width="2"/>
+    <text x="40" y="46" text-anchor="middle" font-family="Fredoka One,cursive" font-size="18" fill="${mapText(HI_status)}">HI</text>
+  </g>`;
+
+  svg.innerHTML = svgContent;
+
+  // Click handler on map paths
+  svg.querySelectorAll('path[data-abbr]').forEach(path => {
+    path.addEventListener('click', () => {
+      const abbr = path.getAttribute('data-abbr');
+      openSpotPanel(abbr);
+    });
+  });
+  // AK/HI click
+  svg.querySelectorAll('g[transform]').forEach((g, i) => {
+    const abbr = i === 0 ? 'AK' : 'HI';
+    g.style.cursor = 'pointer';
+    g.addEventListener('click', () => openSpotPanel(abbr));
+  });
+
+  // Reference panels for small states + other
+  renderRefPanel('ne-panel', ['CT','DE','MA','MD','NJ','NH','RI','VT','WV','DC']);
+  renderRefPanel('other-panel', ['NL','PE','US']);
+}
+
+function renderRefPanel(id, abbrs) {
+  const panel = document.getElementById(id);
+  if (!panel) return;
+  panel.innerHTML = '';
+  const NAMES = {
+    CT:'Connecticut',DE:'Delaware',MA:'Massachusetts',MD:'Maryland',NJ:'New Jersey',
+    NH:'New Hampshire',RI:'Rhode Island',VT:'Vermont',WV:'West Virginia',DC:'Washington DC',
+    NL:'Newfoundland',PE:'PEI',US:'US Gov'
+  };
+  abbrs.forEach(abbr => {
+    const status = getSpotStatus(abbr);
+    const pts = status!=='none' ? platePoints(abbr) : null;
+    const cell = document.createElement('div');
+    cell.className='ref-cell'+(status==='new'?' is-new':status==='old'?' is-old':'');
+    cell.title = NAMES[abbr]||abbr;
+    cell.innerHTML='<span class="ref-abbr">'+abbr+'</span>'+(pts!==null?'<span class="ref-pts">'+pts+' pts</span>':'');
+    cell.style.cursor='pointer';
+    cell.onclick = () => openSpotPanel(abbr);
+    panel.appendChild(cell);
+  });
+}
+
+
+// ── PWA install ──
 let deferredPrompt = null;
 const installBar = document.getElementById('install-bar');
 const installBtn = document.getElementById('install-btn');
 const installDismiss = document.getElementById('install-dismiss');
 const iosInstructions = document.getElementById('ios-instructions');
 
-function isIOS() {
-  return /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
-}
-function isInStandaloneMode() {
-  return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
-}
+function isIOS() { return /iphone|ipad|ipod/i.test(navigator.userAgent)&&!window.MSStream; }
+function isInStandaloneMode() { return window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone; }
 
 if (!isInStandaloneMode()) {
   if (isIOS()) {
     installBar.classList.add('visible');
-    installBtn.style.display = 'none';
-    iosInstructions.style.display = 'block';
+    installBtn.style.display='none';
+    iosInstructions.style.display='block';
   } else {
-    window.addEventListener('beforeinstallprompt', e => {
-      e.preventDefault();
-      deferredPrompt = e;
-      installBar.classList.add('visible');
+    window.addEventListener('beforeinstallprompt',e=>{
+      e.preventDefault(); deferredPrompt=e; installBar.classList.add('visible');
     });
   }
 }
-
-installBtn.addEventListener('click', async () => {
-  if (!deferredPrompt) return;
+installBtn.addEventListener('click',async()=>{
+  if(!deferredPrompt) return;
   deferredPrompt.prompt();
-  const { outcome } = await deferredPrompt.userChoice;
-  deferredPrompt = null;
-  installBar.classList.remove('visible');
+  await deferredPrompt.userChoice;
+  deferredPrompt=null; installBar.classList.remove('visible');
 });
+installDismiss.addEventListener('click',()=>installBar.classList.remove('visible'));
+window.addEventListener('appinstalled',()=>installBar.classList.remove('visible'));
 
-installDismiss.addEventListener('click', () => {
-  installBar.classList.remove('visible');
-});
-
-window.addEventListener('appinstalled', () => {
-  installBar.classList.remove('visible');
-});
+// expose renderFeed globally for filter banner button
+window.renderFeed = renderFeed;
 
 </script>
 
