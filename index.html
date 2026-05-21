@@ -1392,31 +1392,42 @@ async function renderMap() {
     const d3 = await import('https://cdn.jsdelivr.net/npm/d3@7/+esm');
     const topojson = await import('https://cdn.jsdelivr.net/npm/topojson-client@3/+esm');
 
-    // Fetch US atlas (pre-projected Albers USA, 975×610 viewport)
-    const usData = await fetch('https://cdn.jsdelivr.net/npm/us-atlas@3/states-albers-10m.json').then(r=>r.json());
+    // Fetch US atlas (pre-projected Albers USA, 975×610 viewport) AND Canada provinces
+    const [usData, caGeoJson] = await Promise.all([
+      fetch('https://cdn.jsdelivr.net/npm/us-atlas@3/states-albers-10m.json').then(r=>r.json()),
+      fetch('https://cdn.jsdelivr.net/gh/nvkelso/natural-earth-vector/geojson/ne_50m_admin_1_states_provinces.geojson').then(r=>r.json()),
+    ]);
 
-    // Build the SVG
-    const W = wrap.clientWidth || 360;
-    const H = Math.round(W * 0.72); // ~same aspect as 975x610 plus Canada strip
+    // Filter to Canadian provinces/territories we care about
+    const CA_ABBR_MAP = {
+      'British Columbia':'BC','Alberta':'AB','Saskatchewan':'SK','Manitoba':'MB',
+      'Ontario':'ON','Quebec':'QC','New Brunswick':'NB','Nova Scotia':'NS',
+      'Prince Edward Island':'PE','Newfoundland and Labrador':'NL',
+      'Yukon':'YT','Northwest Territories':'NT','Nunavut':'NU',
+    };
+    const caFeatures = caGeoJson.features.filter(f => {
+      const iso = f.properties.iso_a2 || f.properties.adm0_a3;
+      return iso === 'CA' || f.properties.adm0_a3 === 'CAN';
+    });
 
+    // Build the SVG — viewBox matches us-atlas (975×610) with extra room above for Canada
     const svgEl = d3.select(wrap).append('svg')
       .attr('id','us-map-svg')
-      .attr('viewBox', '0 -110 975 720')
+      .attr('viewBox', '0 -120 975 730')
       .attr('style','width:100%;height:auto;display:block;');
 
     const defs = svgEl.append('defs');
 
-    // Canada fade gradient — provinces are visible near the US border, fade toward top
-    // In SVG mask: white=show, black=hide
+    // Canada fade gradient — fades toward top edge, solid at US border
     const grad = defs.append('linearGradient')
       .attr('id','canada-fade')
-      .attr('x1','0').attr('y1','-110').attr('x2','0').attr('y2','90')
+      .attr('x1','0').attr('y1','-120').attr('x2','0').attr('y2','80')
       .attr('gradientUnits','userSpaceOnUse');
-    grad.append('stop').attr('offset','0%').attr('stop-color','white').attr('stop-opacity',0.45);
-    grad.append('stop').attr('offset','55%').attr('stop-color','white').attr('stop-opacity',0.82);
+    grad.append('stop').attr('offset','0%').attr('stop-color','white').attr('stop-opacity',0.35);
+    grad.append('stop').attr('offset','60%').attr('stop-color','white').attr('stop-opacity',0.9);
     grad.append('stop').attr('offset','100%').attr('stop-color','white').attr('stop-opacity',1);
     const mask = defs.append('mask').attr('id','canada-mask');
-    mask.append('rect').attr('x',0).attr('y',-160).attr('width',975).attr('height',420)
+    mask.append('rect').attr('x',-20).attr('y',-160).attr('width',1020).attr('height',400)
       .attr('fill','url(#canada-fade)');
 
     // Drop shadow filter
@@ -1424,68 +1435,37 @@ async function renderMap() {
     filt.append('feDropShadow').attr('dx',0).attr('dy',1).attr('stdDeviation',1)
       .attr('flood-color','rgba(0,0,0,0.15)');
 
-    // ── Canadian provinces — properly projected to match us-atlas Albers coordinate space ──
-    // Coordinates derived by calibrating pyproj Albers Equal Area against known us-atlas
-    // state boundary points. Southern seam uses exact us-atlas coordinates for seamless join.
-    // The viewBox is "0 -150 975 760"; provinces extend upward (negative y) and are clipped.
-    const CA_PROVINCES = [
-      // [abbr, path-d, labelX, labelY]
-      // BC: Pacific coast → WA/ID/MT border seam → 120°W → clipped top
-      ['BC',
-        'M 35,-160 L 35,5 55,18 65,23 95,13 128.6,23.6 188.5,38.0 188.2,-160 Z',
-        115, -55],
-      // AB: 120°W to 110°W, 49°N to clipped top (nearly rectangular)
-      ['AB',
-        'M 188.2,-160 L 188.5,38.0 281.2,55.0 315.6,-160 Z',
-        250, -52],
-      // SK: 110°W to 101.35°W
-      ['SK',
-        'M 315.6,-160 L 281.2,55.0 415.1,68.4 427.3,-160 Z',
-        370, -50],
-      // MB: 101.35°W to ON border (Lake of the Woods area)
-      ['MB',
-        'M 427.3,-160 L 415.1,68.4 479.4,70.3 511.4,61.0 594.2,-5.7 509.8,-160 Z',
-        468, -48],
-      // ON: Great Lakes southern border + James Bay/Hudson Bay shape
-      ['ON',
-        'M 509.8,-160 L 594.2,-5.7 511.4,61.0 684.1,118.0 713.2,150.8 731.7,222.4 785.8,190.5 835.1,127.2 769.8,91.5 752.8,-3.4 716.2,-160 Z',
-        640, -42],
-      // QC: Ottawa River south → Gaspé coast → northern clip
-      ['QC',
-        'M 716.2,-160 L 752.8,-3.4 769.8,91.5 835.1,127.2 848.0,124.1 944.1,46.1 953.1,15.0 971.8,16.2 986.8,31.4 1013.0,73.5 993.4,-160 Z',
-        855, -42],
-      // NB: tucked between QC, ME, and the Bay of Fundy
-      ['NB',
-        'M 944.1,46.1 L 930.0,37.9 953.1,15.0 971.8,16.2 986.8,31.4 997.5,53.3 1003.7,56.2 970.4,65.4 966.1,84.9 944.1,46.1 Z',
-        968, 58],
-      // NS: peninsula + Cape Breton Island
-      ['NS',
-        'M 1003.7,56.2 L 1013.0,73.5 1015.3,64.8 1071.6,26.7 1063.7,6.4 1048.0,33.9 1027.8,80.9 1000.8,111.6 990.6,107.4 991.7,94.1 1003.7,56.2 Z',
-        1028, 86],
-      // PE: Prince Edward Island
-      ['PE',
-        'M 997.4,27.5 L 1002.7,22.9 1022.0,38.9 1039.5,34.6 1042.9,20.2 1023.8,14.8 997.4,27.5 Z',
-        1020, 28],
-    ];
+    // ── Canadian provinces — rendered via D3 geoAlbersUsa projection ──
+    // Natural Earth admin-1 GeoJSON projected with the same albersUsa used for states,
+    // so borders line up exactly with us-atlas. Clipped/faded by the mask above.
+    const albersUsa = d3.geoAlbersUsa().scale(1300).translate([487.5, 305]);
+    const caPath = d3.geoPath().projection(albersUsa);
 
     const caGroup = svgEl.append('g').attr('mask','url(#canada-mask)');
-    CA_PROVINCES.forEach(([abbr, d, lx, ly]) => {
+    caFeatures.forEach(feature => {
+      const name = feature.properties.name || feature.properties.gn_name || '';
+      const abbr = CA_ABBR_MAP[name];
+      if (!abbr) return;
+      const dPath = caPath(feature);
+      if (!dPath) return;
       const status = getSpotStatus(abbr);
-      const isSmall = ['NB','NS','PE'].includes(abbr);
+      const isSmall = ['NB','NS','PE','PEI'].includes(abbr);
       caGroup.append('path')
-        .attr('d', d)
+        .attr('d', dPath)
         .attr('fill', mapFill(status))
         .attr('stroke', 'white')
         .attr('stroke-width', 0.7)
         .attr('data-ca-abbr', abbr)
-        .attr('style', 'cursor:pointer')
+        .attr('style','cursor:pointer')
         .on('click', () => openSpotPanel(abbr));
-      if (!isSmall || ly > 0) {
+      // Label at centroid
+      const centroid = caPath.centroid(feature);
+      if (centroid && !isNaN(centroid[0]) && centroid[1] > -105 && !isSmall) {
         caGroup.append('text')
-          .attr('x', lx).attr('y', ly)
+          .attr('x', centroid[0]).attr('y', centroid[1] + 4)
           .attr('text-anchor','middle')
           .attr('font-family','Fredoka One, cursive')
-          .attr('font-size', isSmall ? 9 : 10)
+          .attr('font-size', 10)
           .attr('fill', mapText(status))
           .attr('pointer-events','none')
           .text(abbr);
