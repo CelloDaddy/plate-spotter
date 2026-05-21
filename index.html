@@ -1401,19 +1401,21 @@ async function renderMap() {
 
     const svgEl = d3.select(wrap).append('svg')
       .attr('id','us-map-svg')
-      .attr('viewBox', `0 0 975 700`)
+      .attr('viewBox', '0 -140 975 750')
       .attr('style','width:100%;height:auto;display:block;');
 
     const defs = svgEl.append('defs');
 
-    // Canada fade gradient + mask
+    // Canada fade gradient + mask — fades from top (-140) down to ~y=0 (US border)
     const grad = defs.append('linearGradient')
-      .attr('id','canada-fade').attr('x1',0).attr('y1',0).attr('x2',0).attr('y2',1);
+      .attr('id','canada-fade')
+      .attr('x1','0').attr('y1','-140').attr('x2','0').attr('y2','0')
+      .attr('gradientUnits','userSpaceOnUse');
     grad.append('stop').attr('offset','0%').attr('stop-color','#F7F6F2').attr('stop-opacity',1);
-    grad.append('stop').attr('offset','50%').attr('stop-color','#F7F6F2').attr('stop-opacity',0.55);
+    grad.append('stop').attr('offset','55%').attr('stop-color','#F7F6F2').attr('stop-opacity',0.4);
     grad.append('stop').attr('offset','100%').attr('stop-color','#F7F6F2').attr('stop-opacity',0);
     const mask = defs.append('mask').attr('id','canada-mask');
-    mask.append('rect').attr('x',0).attr('y',0).attr('width',975).attr('height',140)
+    mask.append('rect').attr('x',0).attr('y',-140).attr('width',975).attr('height',140)
       .attr('fill','url(#canada-fade)');
 
     // Drop shadow filter
@@ -1421,40 +1423,101 @@ async function renderMap() {
     filt.append('feDropShadow').attr('dx',0).attr('dy',1).attr('stdDeviation',1)
       .attr('flood-color','rgba(0,0,0,0.15)');
 
-    // ── Canadian provinces (hand-projected to match Albers USA coordinate space) ──
-    // These are drawn ABOVE the US map (y < ~90) and faded out
-    const CA_PATHS_D3 = {
-      BC: 'M0,90 L10,30 L50,0 L85,0 L85,90 L60,105 L30,105 Z',
-      AB: 'M85,0 L155,0 L200,0 L200,90 L155,92 L100,92 L85,90 Z',
-      SK: 'M200,0 L290,0 L330,0 L330,90 L290,92 L200,90 Z',
-      MB: 'M330,0 L420,0 L460,10 L460,90 L410,95 L370,95 L330,90 Z',
-      ON: 'M460,10 L590,5 L650,30 L660,75 L620,90 L560,95 L490,95 L460,90 Z',
-      QC: 'M650,30 L750,0 L820,0 L860,20 L870,60 L840,90 L790,100 L730,100 L680,90 L660,75 Z',
-      NB: 'M860,60 L890,50 L910,70 L900,95 L875,100 L860,85 Z',
-      NS: 'M900,95 L920,85 L935,100 L920,112 L905,110 Z',
+    // Build Albers USA projection matching the us-atlas pre-projected coordinate space (975×610)
+    const albersUSA = d3.geoAlbersUsa().scale(1300).translate([487.5, 305]);
+
+    // Fetch Canada provinces TopoJSON (real geographic shapes)
+    const caData = await fetch('https://cdn.jsdelivr.net/gh/deldersveld/topojson@master/countries/canada/canada-provinces.json')
+      .then(r => r.ok ? r.json() : null)
+      .catch(() => null);
+
+    // Province name → abbr mapping for deldersveld dataset
+    const CA_NAME_TO_ABBR = {
+      'British Columbia':'BC','Alberta':'AB','Saskatchewan':'SK','Manitoba':'MB',
+      'Ontario':'ON','Quebec':'QC','New Brunswick':'NB','Nova Scotia':'NS',
+      'Prince Edward Island':'PE','Newfoundland and Labrador':'NL',
+      'Yukon':'YT','Northwest Territories':'NT','Nunavut':'NU'
     };
 
     const caGroup = svgEl.append('g').attr('mask','url(#canada-mask)');
-    Object.entries(CA_PATHS_D3).forEach(([abbr, d]) => {
-      const status = getSpotStatus(abbr);
-      caGroup.append('path')
-        .attr('d', d)
-        .attr('fill', mapFill(status))
-        .attr('stroke', 'white')
-        .attr('stroke-width', 0.5);
-      caGroup.append('text')
-        .attr('x', getCaLabelX(abbr))
-        .attr('y', getCaLabelY(abbr))
-        .attr('text-anchor','middle')
-        .attr('font-family','Fredoka One, cursive')
-        .attr('font-size', 11)
-        .attr('fill', mapText(status))
-        .attr('pointer-events','none')
-        .text(abbr);
-    });
 
-    // ── US States (from us-atlas, Albers projected, shifted down to make room for Canada) ──
-    const g = svgEl.append('g').attr('transform','translate(0,90)').attr('filter','url(#ds)');
+    if (caData) {
+      // Use real TopoJSON province shapes, projected with Albers USA
+      const caPath = d3.geoPath().projection(albersUSA);
+      const caKey = Object.keys(caData.objects)[0];
+      const caFeatures = topojson.feature(caData, caData.objects[caKey]).features;
+
+      caFeatures.forEach(feature => {
+        const name = feature.properties.name || feature.properties.NAME || feature.properties.province || '';
+        const abbr = CA_NAME_TO_ABBR[name];
+        if (!abbr || !CA_BORDER_PROVINCES.has(abbr)) return;
+
+        const status = getSpotStatus(abbr);
+        const pathStr = caPath(feature);
+        if (!pathStr) return;
+
+        caGroup.append('path')
+          .attr('d', pathStr)
+          .attr('fill', mapFill(status))
+          .attr('stroke', 'white')
+          .attr('stroke-width', 0.5)
+          .attr('data-ca-abbr', abbr);
+
+        const centroid = caPath.centroid(feature);
+        if (centroid && !isNaN(centroid[0])) {
+          caGroup.append('text')
+            .attr('x', centroid[0])
+            .attr('y', centroid[1] + 4)
+            .attr('text-anchor','middle')
+            .attr('font-family','Fredoka One, cursive')
+            .attr('font-size', 11)
+            .attr('fill', mapText(status))
+            .attr('pointer-events','none')
+            .text(abbr);
+        }
+      });
+    } else {
+      // Fallback: carefully hand-tuned paths aligned to Albers USA coordinate space (975×610)
+      // These are offset upward by -90 since US states are translated down by +90
+      // x-range: BC starts ~50, NS ends ~925; y-range: -140 to 0 (above US border)
+      const CA_PATHS_D3 = {
+        BC: 'M52,-130 L52,0 L108,0 L108,-50 L95,-80 L100,-130 Z',
+        AB: 'M108,-130 L108,0 L192,0 L192,-130 Z',
+        SK: 'M192,-130 L192,0 L280,0 L280,-130 Z',
+        MB: 'M280,-130 L280,0 L363,8 L380,-10 L370,-130 Z',
+        ON: 'M363,8 L363,-50 L420,-90 L500,-120 L560,-100 L600,-50 L620,0 L560,10 L480,15 L410,10 Z',
+        QC: 'M600,-50 L620,0 L700,10 L780,0 L830,-20 L860,-60 L840,-100 L770,-130 L680,-130 L600,-90 Z',
+        NB: 'M830,-20 L860,-60 L890,-40 L900,0 L870,10 L840,5 Z',
+        NS: 'M870,10 L900,0 L925,10 L920,30 L895,35 L875,25 Z',
+      };
+      const CA_LABEL = {
+        BC:{x:80,y:-60}, AB:{x:150,y:-60}, SK:{x:236,y:-60}, MB:{x:322,y:-55},
+        ON:{x:490,y:-40}, QC:{x:730,y:-50}, NB:{x:865,y:-20}, NS:{x:898,y:18}
+      };
+      Object.entries(CA_PATHS_D3).forEach(([abbr, d]) => {
+        const status = getSpotStatus(abbr);
+        caGroup.append('path')
+          .attr('d', d)
+          .attr('fill', mapFill(status))
+          .attr('stroke', 'white')
+          .attr('stroke-width', 0.5)
+          .attr('data-ca-abbr', abbr);
+        const lbl = CA_LABEL[abbr];
+        if (lbl) {
+          caGroup.append('text')
+            .attr('x', lbl.x).attr('y', lbl.y + 4)
+            .attr('text-anchor','middle')
+            .attr('font-family','Fredoka One, cursive')
+            .attr('font-size', 11)
+            .attr('fill', mapText(status))
+            .attr('pointer-events','none')
+            .text(abbr);
+        }
+      });
+    }
+
+    // ── US States (from us-atlas, Albers projected) ──
+    const g = svgEl.append('g').attr('filter','url(#ds)');
     const path = d3.geoPath();
     const features = topojson.feature(usData, usData.objects.states).features;
 
@@ -1524,19 +1587,18 @@ function _recolorMap() {
   });
 
   // Recolor Canada paths and labels
-  caGroup.selectAll('path').each(function(d, i) {
-    // We can't easily look up abbr, so just re-render Canada group
+  caGroup.selectAll('path[data-ca-abbr]').each(function() {
+    const abbr = this.getAttribute('data-ca-abbr');
+    const status = getSpotStatus(abbr);
+    this.setAttribute('fill', mapFill(status));
+  });
+  caGroup.selectAll('text').each(function() {
+    const abbr = this.textContent;
+    const status = getSpotStatus(abbr);
+    this.setAttribute('fill', mapText(status));
   });
 }
 
-function getCaLabelX(abbr) {
-  const xs = {BC:42,AB:142,SK:265,MB:395,ON:555,QC:755,NB:885,NS:917};
-  return xs[abbr] || 100;
-}
-function getCaLabelY(abbr) {
-  const ys = {BC:70,AB:60,SK:60,MB:60,ON:60,QC:60,NB:78,NS:105};
-  return ys[abbr] || 60;
-}
 function getFontSize(abbr) {
   const small = new Set(['WV','VT','NH','ME','RI','CT','DE','NJ','MD','DC','HI']);
   return small.has(abbr) ? 8 : 10;
