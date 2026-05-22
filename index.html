@@ -629,11 +629,11 @@ const REGIONS = [
   {abbr:'OR',name:'Oregon'},{abbr:'PA',name:'Pennsylvania'},{abbr:'RI',name:'Rhode Island'},{abbr:'SC',name:'South Carolina'},
   {abbr:'SD',name:'South Dakota'},{abbr:'TN',name:'Tennessee'},{abbr:'TX',name:'Texas'},{abbr:'UT',name:'Utah'},
   {abbr:'VT',name:'Vermont'},{abbr:'VA',name:'Virginia'},{abbr:'WA',name:'Washington'},{abbr:'WV',name:'West Virginia'},
-  {abbr:'WI',name:'Wisconsin'},{abbr:'WY',name:'Wyoming'},{abbr:'DC',name:'Washington DC'},
+  {abbr:'WI',name:'Wisconsin'},{abbr:'WY',name:'Wyoming'},
+  {abbr:'DC',name:'Washington DC'},{abbr:'US',name:'US Government'},
   {abbr:'AB',name:'Alberta'},{abbr:'BC',name:'Brit. Columbia'},{abbr:'MB',name:'Manitoba'},{abbr:'NB',name:'New Brunswick'},
   {abbr:'NL',name:'Newfoundland'},{abbr:'NS',name:'Nova Scotia'},{abbr:'ON',name:'Ontario'},{abbr:'PE',name:'PEI'},
-  {abbr:'QC',name:'Quebec'},{abbr:'SK',name:'Saskatchewan'},
-  {abbr:'US',name:'US Government'}
+  {abbr:'QC',name:'Quebec'},{abbr:'SK',name:'Saskatchewan'}
 ];
 const TOTAL = REGIONS.length;
 const US_STATES = new Set(['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY']);
@@ -1142,9 +1142,22 @@ document.getElementById('log-btn').onclick = async () => {
         if (success) { spotSession.loggedSpotters.push(spotter); anySuccess = true; }
       }
       if (anySuccess) {
-        spotSession.multiSelected = new Set();
+        spotSession = null;
         document.getElementById('notes-in').value = '';
-        updateSpotPanel();
+        document.getElementById('loc-in').value = '';
+        document.getElementById('loc-in').readOnly = false;
+        document.getElementById('loc-in').style.opacity = '1';
+        document.getElementById('loc-in').placeholder = 'e.g. I-90 near Chicago';
+        document.getElementById('spot-session-header').style.display = 'none';
+        document.getElementById('spot-context-banner').className = 'spot-context-banner';
+        document.getElementById('spot-done-btn').style.display = 'none';
+        document.getElementById('log-btn').textContent = 'Log Sighting 🎯';
+        document.getElementById('loc-label').style.display = 'none';
+        document.getElementById('loc-label-free').style.display = 'block';
+        document.getElementById('spotter-sel').style.display = '';
+        const multiWrap = document.getElementById('multi-spotter-wrap');
+        if (multiWrap) multiWrap.remove();
+        switchTab('scores');
       }
     } else {
       // Single dropdown mode (first spot)
@@ -1760,11 +1773,10 @@ function renderRefPanel(id, abbrs) {
   };
   abbrs.forEach(abbr => {
     const status = getSpotStatus(abbr);
-    const pts = status!=='none' ? platePoints(abbr) : null;
     const cell = document.createElement('div');
     cell.className='ref-cell'+(status==='new'?' is-new':status==='old'?' is-old':'');
     cell.title = NAMES[abbr]||abbr;
-    cell.innerHTML='<span class="ref-abbr">'+abbr+'</span>'+(pts!==null?'<span class="ref-pts">'+pts+' pts</span>':'');
+    cell.innerHTML='<span class="ref-abbr">'+abbr+'</span>';
     cell.style.cursor='pointer';
     cell.onclick = () => openSpotPanel(abbr);
     panel.appendChild(cell);
