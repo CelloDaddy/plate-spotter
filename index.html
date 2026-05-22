@@ -442,7 +442,7 @@ canvas#confetti { position: fixed; top: 0; left: 0; width: 100%; height: 100%; p
 
 <div class="stats-bar">
   <div class="stat-pill"><div class="stat-num" id="s-spotted">0</div><div class="stat-lbl">Spotted</div></div>
-  <div class="stat-pill"><div class="stat-num" id="s-remain">63</div><div class="stat-lbl">Left</div></div>
+  <div class="stat-pill"><div class="stat-num" id="s-remain">50</div><div class="stat-lbl">States Left</div></div>
   <div class="stat-pill"><div class="stat-num" id="s-pts">0</div><div class="stat-lbl">Points</div></div>
   <div class="stat-pill"><div class="stat-num" id="s-players">0</div><div class="stat-lbl">Players</div></div>
 </div>
@@ -499,6 +499,9 @@ canvas#confetti { position: fixed; top: 0; left: 0; width: 100%; height: 100%; p
 
   <!-- MAP -->
   <div class="panel" id="tab-map">
+    <div class="plates-filter-row" id="map-filter-row">
+      <button class="plates-chip active" data-player="__family__">Family</button>
+    </div>
     <div class="map-wrap-outer" id="map-wrap-outer">
       <div class="map-fade-top"></div>
       <svg id="us-map-svg" viewBox="0 0 960 720" xmlns="http://www.w3.org/2000/svg"></svg>
@@ -593,16 +596,17 @@ const REGIONS = [
   {abbr:'US',name:'US Government'}
 ];
 const TOTAL = REGIONS.length;
+const US_STATES = new Set(['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY']);
+const US_STATES_TOTAL = 50;
 
 const PLATE_POINTS = {
-  IL:5, IA:5, MO:5, WI:5, IN:5, KY:5, MI:5,
-  MN:8, OH:8, TN:8, AR:8, NE:8, KS:8,
-  TX:11, GA:11, FL:11, NY:11, PA:11, CO:11, WA:11, OR:11, CA:11, AZ:11, NM:11,
-  VA:15, NC:15, SC:15, MD:15, NJ:15, CT:15, MA:15, LA:15, MS:15, AL:15,
-  ND:15, SD:15, WY:15, MT:15, ID:15, NV:15, UT:15,
-  ME:20, VT:20, NH:20, WV:20, DE:20, RI:20, OK:20,
-  AK:25, HI:25, DC:25, US:11,
-  AB:25, BC:25, MB:25, NB:25, NL:25, NS:25, ON:25, PE:25, QC:25, SK:25
+  IL:5, IA:5, MO:5, WI:5, IN:5,
+  MN:8, OH:8, TN:8, KS:8, KY:8, MI:8,
+  TX:11, GA:11, FL:11, NY:11, PA:11, CO:11, WA:11, OR:11, CA:11, AZ:11, NM:11, AR:11, NE:11, US:11,
+  VA:15, NC:15, SC:15, MA:15, LA:15, MS:15, AL:15, ND:15, SD:15, WY:15, ID:15, NV:15, UT:15,
+  ME:20, VT:20, NH:20, DE:20, OK:20, MD:20, NJ:20, CT:20, MT:20,
+  AK:25, HI:25, WV:25, RI:25, AB:25, BC:25, MB:25, ON:25,
+  DC:30, NB:30, NL:30, NS:30, PE:30, QC:30, SK:30
 };
 function platePoints(abbr) { return PLATE_POINTS[abbr] || 10; }
 
@@ -643,6 +647,7 @@ const PLATE_COLORS = {
 let gameState = { players: {}, spotted: {}, log: {} };
 let logFilter = null;
 let platesFilter = '__family__'; // player filter on All Plates tab
+let mapFilter = '__family__'; // player filter on Map tab
 
 // Spot session state
 let spotSession = null;
@@ -755,9 +760,10 @@ function render() {
   if (gameState.deadline) startCountdown(gameState.deadline);
   else document.getElementById('trip-label').textContent = formatGameStart(gameState.startedAt);
   const spottedCount = spottedKeys.length;
-  const pct = Math.round(spottedCount/TOTAL*100);
+  const usSpottedCount = spottedKeys.filter(k => US_STATES.has(k)).length;
+  const pct = Math.round(usSpottedCount/US_STATES_TOTAL*100);
   document.getElementById('s-spotted').textContent = spottedCount;
-  document.getElementById('s-remain').textContent = TOTAL-spottedCount;
+  document.getElementById('s-remain').textContent = US_STATES_TOTAL - usSpottedCount;
   document.getElementById('pct-lbl').textContent = pct+'%';
   document.getElementById('prog-fill').style.width = pct+'%';
   const players = Object.values(gameState.players);
@@ -765,6 +771,7 @@ function render() {
   const totalPts = players.reduce((a,p)=>a+(p.points||0),0);
   document.getElementById('s-pts').textContent = totalPts;
   renderPlatesFilter();
+  renderMapFilter();
   renderGrid();
   renderMap();
   renderSpotterSel();
@@ -772,6 +779,25 @@ function render() {
   renderFeed();
   renderChips();
   renderHistory();
+}
+
+// ── Map filter chips ──
+function renderMapFilter() {
+  const row = document.getElementById('map-filter-row');
+  if (!row) return;
+  const players = Object.values(gameState.players);
+  if (mapFilter !== '__family__' && !players.find(p=>p.name===mapFilter)) mapFilter = '__family__';
+  row.innerHTML = '';
+  const make = (label, val) => {
+    const btn = document.createElement('button');
+    btn.className = 'plates-chip' + (mapFilter===val?' active':'');
+    btn.textContent = label;
+    btn.dataset.player = val;
+    btn.onclick = () => { mapFilter = val; renderMapFilter(); _recolorMap(); };
+    row.appendChild(btn);
+  };
+  make('Family','__family__');
+  players.forEach(p => make(p.name, p.name));
 }
 
 // ── All Plates filter chips ──
@@ -838,13 +864,11 @@ function renderGrid() {
       const borderStyle = familyHasIt
         ? 'border-color:'+colors.border+';box-shadow:0 0 0 2px var(--amber);'
         : 'border-color:'+colors.border+';';
-      // First-spot bonus is still available if no one in the family has spotted it yet
-      const firstSpotAvailable = !familySpotted;
       cell.style.cssText = 'background:'+colors.bg+';'+borderStyle+'opacity:1;font-weight:900;';
       cell.innerHTML =
         '<span class="plate-abbr" style="color:'+colors.text+';font-weight:900">'+r.abbr+'</span>' +
         '<span class="plate-name" style="color:'+colors.text+';opacity:0.85">'+r.name+'</span>' +
-        (firstSpotAvailable ? '<div class="check-badge" style="background:#F5C518;color:#1C1C1A;font-size:9px;width:14px;height:14px;">★</div>' : '');
+        (familyHasIt ? '<div class="check-badge" style="background:var(--amber);color:white;font-size:7px;">FAM</div>' : '');
       if (!disabled) cell.onclick = () => openSpotPanel(r.abbr);
     }
 
@@ -881,7 +905,6 @@ function updateSpotPanel() {
   if (!spotSession) return;
   const { abbr, lockedLoc, loggedSpotters } = spotSession;
   const region = REGIONS.find(r=>r.abbr===abbr);
-  const familyFirstSpot = !gameState.spotted[abbr] && loggedSpotters.length === 0;
   const isFirstEver = !gameState.spotted[abbr];
 
   // Context banner
@@ -891,7 +914,7 @@ function updateSpotPanel() {
     banner.textContent = '🎉 New plate! Who spotted it first?';
   } else if (!isFirstEver) {
     banner.className = 'spot-context-banner dup-spot';
-    banner.textContent = '⚠️ This plate was already logged — no first-spot bonus, but you still earn ' + platePoints(abbr) + ' pts!';
+    banner.textContent = '⚠️ This plate was already logged — no first-spot bonus, but each player still earns ' + platePoints(abbr) + ' pts!';
   } else {
     banner.className = 'spot-context-banner first-spot';
     banner.textContent = '➕ Adding another spotter — they earn ' + platePoints(abbr) + ' pts (no first-spot bonus)';
@@ -912,8 +935,30 @@ function updateSpotPanel() {
     alreadyWrap.style.display = 'none';
   }
 
-  // Spotter select — grey out already logged AND already spotted in DB
-  renderSpotterSelForSpot(abbr, loggedSpotters);
+  // Input mode: dropdown for first-spot, multi-buttons for duplicates
+  const spotterSel = document.getElementById('spotter-sel');
+  const multiWrap = document.getElementById('multi-spotter-wrap');
+  const whoLabel = document.querySelector('label[for="spotter-sel"]') || document.querySelector('#tab-spot label');
+
+  if (!isFirstEver) {
+    // Multi-select mode — show player buttons, hide dropdown
+    spotterSel.style.display = 'none';
+    if (!multiWrap) {
+      const wrap = document.createElement('div');
+      wrap.id = 'multi-spotter-wrap';
+      wrap.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;';
+      spotterSel.parentNode.insertBefore(wrap, spotterSel.nextSibling);
+    }
+    renderMultiSpotterButtons(abbr, loggedSpotters);
+    document.getElementById('log-btn').textContent = 'Log Selected Players 🎯';
+  } else {
+    // Single dropdown mode
+    spotterSel.style.display = '';
+    const existingMulti = document.getElementById('multi-spotter-wrap');
+    if (existingMulti) existingMulti.remove();
+    renderSpotterSelForSpot(abbr, loggedSpotters);
+    document.getElementById('log-btn').textContent = loggedSpotters.length > 0 ? 'Log Another Spotter 🎯' : 'Log Sighting 🎯';
+  }
 
   // Location: lock after first log
   const locInput = document.getElementById('loc-in');
@@ -934,7 +979,31 @@ function updateSpotPanel() {
 
   // Show Done button after first successful log
   document.getElementById('spot-done-btn').style.display = loggedSpotters.length > 0 ? '' : 'none';
-  document.getElementById('log-btn').textContent = loggedSpotters.length > 0 ? 'Log Another Spotter 🎯' : 'Log Sighting 🎯';
+}
+
+function renderMultiSpotterButtons(abbr, sessionLoggedSpotters) {
+  const wrap = document.getElementById('multi-spotter-wrap');
+  if (!wrap) return;
+  wrap.innerHTML = '';
+  Object.values(gameState.players).forEach(p => {
+    const alreadyInDB = p.spotted && p.spotted[abbr];
+    const alreadyInSession = sessionLoggedSpotters.includes(p.name);
+    if (alreadyInDB || alreadyInSession) return; // skip already spotted
+    const btn = document.createElement('button');
+    const isSelected = spotSession.multiSelected && spotSession.multiSelected.has(p.name);
+    btn.style.cssText = 'font-family:Nunito,sans-serif;font-size:14px;font-weight:700;padding:9px 18px;border-radius:999px;cursor:pointer;transition:all 0.15s;border:2px solid '+(isSelected?'var(--green)':'var(--border)')+';background:'+(isSelected?'var(--green)':'var(--card)')+';color:'+(isSelected?'white':'var(--text)')+';';
+    btn.textContent = (isSelected ? '✓ ' : '') + p.name;
+    btn.onclick = () => {
+      if (!spotSession.multiSelected) spotSession.multiSelected = new Set();
+      if (spotSession.multiSelected.has(p.name)) spotSession.multiSelected.delete(p.name);
+      else spotSession.multiSelected.add(p.name);
+      renderMultiSpotterButtons(abbr, sessionLoggedSpotters);
+    };
+    wrap.appendChild(btn);
+  });
+  if (wrap.children.length === 0) {
+    wrap.innerHTML = '<span style="font-size:13px;color:var(--muted);font-weight:700;">All players have already spotted this plate.</span>';
+  }
 }
 
 function renderSpotterSelForSpot(abbr, sessionLoggedSpotters) {
@@ -976,9 +1045,6 @@ function renderSpotterSel() {
 
 // ── Log Sighting ──
 document.getElementById('log-btn').onclick = async () => {
-  const spotter = document.getElementById('spotter-sel').value;
-  if (!spotter) { alert('Please select who spotted it!'); return; }
-
   const locInput = document.getElementById('loc-in');
   let loc = locInput.value.trim();
   if (!loc && locInput.placeholder && locInput.placeholder !== 'e.g. I-90 near Chicago' && locInput.placeholder !== 'Getting location…') {
@@ -987,21 +1053,43 @@ document.getElementById('log-btn').onclick = async () => {
   const notes = document.getElementById('notes-in').value.trim();
 
   if (spotSession) {
-    // Session-based log
     const { abbr } = spotSession;
-    const success = await logSpot(spotter, abbr, loc, notes);
-    if (success) {
-      // Lock location after first log
+    const isFirstEver = !gameState.spotted[abbr];
+
+    if (!isFirstEver) {
+      // Batch multi-select mode
+      const selected = spotSession.multiSelected ? [...spotSession.multiSelected] : [];
+      if (selected.length === 0) { alert('Please select at least one player!'); return; }
+      // Lock location after first batch
       if (spotSession.lockedLoc === null) spotSession.lockedLoc = loc;
-      spotSession.loggedSpotters.push(spotter);
-      // Clear only spotter and notes
-      document.getElementById('notes-in').value = '';
-      updateSpotPanel();
+      let anySuccess = false;
+      for (const spotter of selected) {
+        const success = await logSpot(spotter, abbr, spotSession.lockedLoc || loc, notes);
+        if (success) { spotSession.loggedSpotters.push(spotter); anySuccess = true; }
+      }
+      if (anySuccess) {
+        spotSession.multiSelected = new Set();
+        document.getElementById('notes-in').value = '';
+        updateSpotPanel();
+      }
+    } else {
+      // Single dropdown mode (first spot)
+      const spotter = document.getElementById('spotter-sel').value;
+      if (!spotter) { alert('Please select who spotted it!'); return; }
+      const success = await logSpot(spotter, abbr, loc, notes);
+      if (success) {
+        if (spotSession.lockedLoc === null) spotSession.lockedLoc = loc;
+        spotSession.loggedSpotters.push(spotter);
+        document.getElementById('notes-in').value = '';
+        updateSpotPanel();
+      }
     }
   } else {
-    // Fallback: no session (shouldn't happen but keep safe)
+    // Fallback: no session
     const abbr = document.getElementById('plate-sel')?.value;
     if (!abbr) { alert('Please select a state or province!'); return; }
+    const spotter = document.getElementById('spotter-sel').value;
+    if (!spotter) { alert('Please select who spotted it!'); return; }
     await logSpot(spotter, abbr, loc, notes);
     document.getElementById('loc-in').value = '';
     document.getElementById('loc-in').placeholder = 'e.g. I-90 near Chicago';
@@ -1024,6 +1112,9 @@ document.getElementById('spot-done-btn').onclick = () => {
   document.getElementById('log-btn').textContent = 'Log Sighting 🎯';
   document.getElementById('loc-label').style.display = 'none';
   document.getElementById('loc-label-free').style.display = 'block';
+  document.getElementById('spotter-sel').style.display = '';
+  const multiWrap = document.getElementById('multi-spotter-wrap');
+  if (multiWrap) multiWrap.remove();
   switchTab('plates');
 };
 
@@ -1132,7 +1223,10 @@ function renderFeed() {
     const ptsClass = isUndo ? 'feed-pts undone' : 'feed-pts';
     const ptsText = isUndo ? '↩ undone' : '+'+entry.pts+ptsBreakdown;
 
-    item.innerHTML = '<div class="'+abbrClass+'">'+entry.abbr+'</div>'
+    item.innerHTML = '<div class="'+abbrClass+'" style="position:relative;">'
+      +entry.abbr
+      +(isFirst ? '<span style="position:absolute;top:-4px;right:-4px;font-size:10px;line-height:1;background:#F5C518;color:#1C1C1A;border-radius:50%;width:14px;height:14px;display:flex;align-items:center;justify-content:center;font-weight:900;">★</span>' : '')
+      +'</div>'
       +'<div class="feed-info">'
       +'<div class="feed-who">'+entry.spotter+(isFirst?' <span class="badge first">First spot!</span>':'')+'</div>'
       +'<div class="feed-detail">'+entry.date+(entry.loc?' · '+entry.loc:'')+(entry.notes?' · '+entry.notes:'')+(isUndo?' · logged in error':'')+'</div>'
@@ -1368,6 +1462,14 @@ const CA_ISO_TO_ABBR = {
 const CA_BORDER_PROVINCES = new Set(['BC','AB','SK','MB','ON','QC','NB','NS']);
 
 function getSpotStatus(abbr) {
+  if (mapFilter !== '__family__') {
+    const player = Object.values(gameState.players).find(p=>p.name===mapFilter);
+    if (!player || !player.spotted || !player.spotted[abbr]) return 'none';
+    // Use the family spotted entry for recency coloring
+    const entry = gameState.spotted[abbr];
+    const age = Date.now() - (entry?.ts||0);
+    return age < 86400000 ? 'new' : 'old';
+  }
   const entry = gameState.spotted[abbr];
   if (!entry) return 'none';
   const age = Date.now() - (entry.ts||0);
