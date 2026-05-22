@@ -50,6 +50,42 @@ body { font-family: 'Nunito', sans-serif; background: var(--bg); color: var(--te
 .sync-dot.live { background: var(--green); box-shadow: 0 0 6px var(--green); }
 .sync-label { font-size: 12px; opacity: 0.8; }
 
+/* Gear button in topbar */
+.gear-btn {
+  background: rgba(255,255,255,0.12);
+  border: none;
+  border-radius: 50%;
+  width: 36px; height: 36px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  font-size: 18px;
+  transition: background 0.15s;
+  flex-shrink: 0;
+}
+.gear-btn:hover { background: rgba(255,255,255,0.22); }
+.gear-btn:active { background: rgba(255,255,255,0.30); }
+
+/* Settings panel */
+.settings-section-label {
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 1px; color: var(--muted);
+  margin: 20px 0 8px;
+}
+.settings-section-label:first-child { margin-top: 0; }
+.settings-link-row {
+  display: flex; align-items: center; gap: 14px;
+  background: var(--card); border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm); padding: 14px 16px;
+  margin-bottom: 8px; cursor: pointer;
+  transition: border-color 0.15s;
+}
+.settings-link-row:hover { border-color: var(--green); }
+.settings-link-icon { font-size: 22px; width: 28px; text-align: center; }
+.settings-link-text { flex: 1; }
+.settings-link-title { font-size: 15px; font-weight: 700; color: var(--text); }
+.settings-link-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.settings-link-arrow { color: var(--muted); font-size: 16px; }
+
 .progress-wrap { padding: 10px 16px 0; }
 .progress-top { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin-bottom: 6px; font-weight: 600; }
 .progress-bg { background: var(--border); border-radius: 999px; height: 8px; overflow: hidden; }
@@ -283,13 +319,8 @@ canvas#confetti { position: fixed; top: 0; left: 0; width: 100%; height: 100%; p
 /* Map */
 .map-wrap-outer {
   position: relative;
-  overflow: hidden;
+  overflow: visible;
   margin: 0 -4px 0;
-}
-.map-fade-top {
-  position: absolute; top: 0; left: 0; right: 0; height: 20px;
-  background: linear-gradient(to bottom, var(--bg) 0%, transparent 100%);
-  pointer-events: none; z-index: 10;
 }
 #us-map-svg {
   width: 100%; height: auto; display: block;
@@ -419,9 +450,12 @@ canvas#confetti { position: fixed; top: 0; left: 0; width: 100%; height: 100%; p
     <div class="topbar-title">🚗 Peterson Plate Spotter</div>
     <div class="topbar-sub" id="trip-label">Loading…</div>
   </div>
-  <div style="text-align:right">
-    <span class="sync-dot" id="sync-dot"></span>
-    <span class="sync-label" id="sync-label">connecting…</span>
+  <div style="display:flex;align-items:center;gap:10px;">
+    <div style="display:flex;align-items:center;gap:5px;">
+      <span class="sync-dot" id="sync-dot"></span>
+      <span class="sync-label" id="sync-label" style="font-size:11px;opacity:0.6;">connecting…</span>
+    </div>
+    <button class="gear-btn" id="gear-btn" title="Settings">⚙️</button>
   </div>
 </div>
 
@@ -434,8 +468,6 @@ canvas#confetti { position: fixed; top: 0; left: 0; width: 100%; height: 100%; p
   <button class="tab active" data-tab="plates"><span class="nav-icon">🚗</span>Plates</button>
   <button class="tab" data-tab="map"><span class="nav-icon">🗺️</span>Map</button>
   <button class="tab" data-tab="scores"><span class="nav-icon">🏆</span>Scores</button>
-  <button class="tab" data-tab="log"><span class="nav-icon">📋</span>Log</button>
-  <button class="tab" data-tab="players"><span class="nav-icon">👥</span>Players</button>
 </nav>
 
 <div class="content">
@@ -481,7 +513,6 @@ canvas#confetti { position: fixed; top: 0; left: 0; width: 100%; height: 100%; p
       <button class="plates-chip active" data-player="__family__">Family</button>
     </div>
     <div class="map-wrap-outer" id="map-wrap-outer">
-      <div class="map-fade-top"></div>
       <svg id="us-map-svg" viewBox="0 0 960 720" xmlns="http://www.w3.org/2000/svg"></svg>
     </div>
     <div class="map-legend">
@@ -533,6 +564,37 @@ canvas#confetti { position: fixed; top: 0; left: 0; width: 100%; height: 100%; p
       <button class="btn" id="set-deadline-btn">Set Deadline</button>
     </div>
     <div id="reset-btn" style="display:none;"></div>
+  </div>
+
+  <!-- SETTINGS (gear) -->
+  <div class="panel" id="tab-settings">
+    <div class="settings-section-label">Game Activity</div>
+    <div class="settings-link-row" id="settings-go-log">
+      <span class="settings-link-icon">📋</span>
+      <div class="settings-link-text">
+        <div class="settings-link-title">Sighting Log</div>
+        <div class="settings-link-sub">Full history of every plate spotted</div>
+      </div>
+      <span class="settings-link-arrow">›</span>
+    </div>
+
+    <div class="settings-section-label">Game Setup</div>
+    <div class="settings-link-row" id="settings-go-players">
+      <span class="settings-link-icon">👥</span>
+      <div class="settings-link-text">
+        <div class="settings-link-title">Players</div>
+        <div class="settings-link-sub">Add or remove players</div>
+      </div>
+      <span class="settings-link-arrow">›</span>
+    </div>
+    <div class="settings-link-row" id="settings-go-deadline">
+      <span class="settings-link-icon">📅</span>
+      <div class="settings-link-text">
+        <div class="settings-link-title">Game Deadline</div>
+        <div class="settings-link-sub">Set when this game ends</div>
+      </div>
+      <span class="settings-link-arrow">›</span>
+    </div>
   </div>
 
 </div>
@@ -671,6 +733,31 @@ document.querySelectorAll('.tab').forEach(tab => {
     if (tab.dataset.tab === 'log') { logFilter = null; renderFeed(); }
   };
 });
+
+// Gear button → settings panel (not in nav, no nav highlight)
+document.getElementById('gear-btn').onclick = () => {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-settings').classList.add('active');
+};
+
+// Settings → sub-panels
+document.getElementById('settings-go-log').onclick = () => {
+  logFilter = null;
+  switchTab('log');
+  renderFeed();
+};
+document.getElementById('settings-go-players').onclick = () => {
+  switchTab('players');
+  // scroll to players section
+  document.getElementById('tab-players').scrollTop = 0;
+};
+document.getElementById('settings-go-deadline').onclick = () => {
+  switchTab('players');
+  setTimeout(() => {
+    document.getElementById('deadline-input').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, 80);
+};
 
 // ── Countdown ──
 let countdownInterval = null;
@@ -1492,33 +1579,36 @@ async function renderMap() {
     // Filter to Canadian provinces/territories we care about
     const CA_ABBR_MAP = {
       'British Columbia':'BC','Alberta':'AB','Saskatchewan':'SK','Manitoba':'MB',
-      'Ontario':'ON','Quebec':'QC','New Brunswick':'NB','Nova Scotia':'NS',
-      'Prince Edward Island':'PE','Newfoundland and Labrador':'NL',
+      'Ontario':'ON','Quebec':'QC','Québec':'QC','Quebec (Province)':'QC',
+      'New Brunswick':'NB','Nova Scotia':'NS',
+      'Prince Edward Island':'PE','Newfoundland and Labrador':'NL','Newfoundland':'NL',
       'Yukon':'YT','Northwest Territories':'NT','Nunavut':'NU',
     };
     const caFeatures = caGeoJson.features.filter(f => {
-      const iso = f.properties.iso_a2 || f.properties.adm0_a3;
-      return iso === 'CA' || f.properties.adm0_a3 === 'CAN';
+      const iso2 = f.properties.iso_a2 || '';
+      const adm0 = f.properties.adm0_a3 || '';
+      const sov = f.properties.sov_a3 || '';
+      return iso2 === 'CA' || adm0 === 'CAN' || sov === 'CAN';
     });
 
-    // Build the SVG — viewBox matches us-atlas (975×610) with extra room above for Canada
+    // Build the SVG — viewBox matches us-atlas (975×610) with modest room above for Canada
     const svgEl = d3.select(wrap).append('svg')
       .attr('id','us-map-svg')
-      .attr('viewBox', '0 -120 975 730')
-      .attr('style','width:100%;height:auto;display:block;overflow:visible');
+      .attr('viewBox', '0 -80 975 700')
+      .attr('style','width:100%;height:auto;display:block;overflow:visible;margin-top:-8px');
 
     const defs = svgEl.append('defs');
 
     // Canada fade gradient — fades toward top edge, solid at US border
     const grad = defs.append('linearGradient')
       .attr('id','canada-fade')
-      .attr('x1','0').attr('y1','-120').attr('x2','0').attr('y2','80')
+      .attr('x1','0').attr('y1','-80').attr('x2','0').attr('y2','60')
       .attr('gradientUnits','userSpaceOnUse');
-    grad.append('stop').attr('offset','0%').attr('stop-color','white').attr('stop-opacity',0.35);
-    grad.append('stop').attr('offset','60%').attr('stop-color','white').attr('stop-opacity',0.9);
+    grad.append('stop').attr('offset','0%').attr('stop-color','white').attr('stop-opacity',0.2);
+    grad.append('stop').attr('offset','55%').attr('stop-color','white').attr('stop-opacity',0.85);
     grad.append('stop').attr('offset','100%').attr('stop-color','white').attr('stop-opacity',1);
     const mask = defs.append('mask').attr('id','canada-mask');
-    mask.append('rect').attr('x',-20).attr('y',-160).attr('width',1020).attr('height',400)
+    mask.append('rect').attr('x',-20).attr('y',-120).attr('width',1020).attr('height',360)
       .attr('fill','url(#canada-fade)');
 
     // Drop shadow filter
