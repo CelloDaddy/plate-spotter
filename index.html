@@ -838,11 +838,13 @@ function renderGrid() {
       const borderStyle = familyHasIt
         ? 'border-color:'+colors.border+';box-shadow:0 0 0 2px var(--amber);'
         : 'border-color:'+colors.border+';';
+      // First-spot bonus is still available if no one in the family has spotted it yet
+      const firstSpotAvailable = !familySpotted;
       cell.style.cssText = 'background:'+colors.bg+';'+borderStyle+'opacity:1;font-weight:900;';
       cell.innerHTML =
         '<span class="plate-abbr" style="color:'+colors.text+';font-weight:900">'+r.abbr+'</span>' +
         '<span class="plate-name" style="color:'+colors.text+';opacity:0.85">'+r.name+'</span>' +
-        (familyHasIt ? '<div class="check-badge" style="background:var(--amber);color:white;font-size:7px;">FAM</div>' : '');
+        (firstSpotAvailable ? '<div class="check-badge" style="background:#F5C518;color:#1C1C1A;font-size:9px;width:14px;height:14px;">★</div>' : '');
       if (!disabled) cell.onclick = () => openSpotPanel(r.abbr);
     }
 
