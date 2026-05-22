@@ -50,47 +50,32 @@ body { font-family: 'Nunito', sans-serif; background: var(--bg); color: var(--te
 .sync-dot.live { background: var(--green); box-shadow: 0 0 6px var(--green); }
 .sync-label { font-size: 12px; opacity: 0.8; }
 
-.stats-bar {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 0;
-  background: var(--text);
-  border-top: 1px solid rgba(255,255,255,0.1);
-}
-.stat-pill { text-align: center; padding: 10px 8px; border-right: 1px solid rgba(255,255,255,0.1); }
-.stat-pill:last-child { border-right: none; }
-.stat-num { font-family: 'Fredoka One', cursive; font-size: 20px; color: white; }
-.stat-lbl { font-size: 10px; color: rgba(255,255,255,0.55); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 1px; }
-
-.progress-wrap { padding: 14px 16px 0; }
+.progress-wrap { padding: 10px 16px 0; }
 .progress-top { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin-bottom: 6px; font-weight: 600; }
 .progress-bg { background: var(--border); border-radius: 999px; height: 8px; overflow: hidden; }
 .progress-fill { height: 100%; background: linear-gradient(90deg, var(--green), var(--amber)); border-radius: 999px; transition: width 0.5s ease; }
 
-.tabs {
-  display: flex;
-  padding: 12px 16px 0;
-  gap: 6px;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-}
-.tabs::-webkit-scrollbar { display: none; }
-.tab {
+/* Bottom nav bar */
+.bottom-nav {
+  position: fixed; bottom: 0; left: 0; right: 0;
   background: var(--card);
-  border: 1.5px solid var(--border);
-  border-radius: 999px;
-  padding: 6px 16px;
-  font-size: 13px;
-  font-weight: 700;
-  font-family: 'Nunito', sans-serif;
-  color: var(--muted);
-  cursor: pointer;
-  white-space: nowrap;
-  transition: all 0.15s;
+  border-top: 1.5px solid var(--border);
+  display: flex;
+  z-index: 150;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
-.tab.active { background: var(--text); color: white; border-color: var(--text); }
+.tab {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  gap: 3px; padding: 10px 4px 8px;
+  background: none; border: none; border-radius: 0;
+  font-size: 10px; font-weight: 700; font-family: 'Nunito', sans-serif;
+  color: var(--muted); cursor: pointer;
+  transition: color 0.15s; white-space: nowrap;
+}
+.tab .nav-icon { font-size: 20px; line-height: 1; display: block; }
+.tab.active { color: var(--green); }
 
-.content { padding: 14px 16px 100px; }
+.content { padding: 14px 16px 120px; }
 .panel { display: none; }
 .panel.active { display: block; }
 
@@ -302,7 +287,7 @@ canvas#confetti { position: fixed; top: 0; left: 0; width: 100%; height: 100%; p
   margin: 0 -4px 0;
 }
 .map-fade-top {
-  position: absolute; top: 0; left: 0; right: 0; height: 80px;
+  position: absolute; top: 0; left: 0; right: 0; height: 20px;
   background: linear-gradient(to bottom, var(--bg) 0%, transparent 100%);
   pointer-events: none; z-index: 10;
 }
@@ -349,7 +334,7 @@ canvas#confetti { position: fixed; top: 0; left: 0; width: 100%; height: 100%; p
 .install-bar {
   position: fixed; bottom: 0; left: 0; right: 0;
   background: var(--card); border-top: 1.5px solid var(--border);
-  padding: 12px 16px 24px; z-index: 200;
+  padding: 12px 16px 24px; z-index: 300;
   display: none;
 }
 .install-bar.visible { display: block; }
@@ -440,25 +425,18 @@ canvas#confetti { position: fixed; top: 0; left: 0; width: 100%; height: 100%; p
   </div>
 </div>
 
-<div class="stats-bar">
-  <div class="stat-pill"><div class="stat-num" id="s-spotted">0</div><div class="stat-lbl">Spotted</div></div>
-  <div class="stat-pill"><div class="stat-num" id="s-remain">50</div><div class="stat-lbl">States Left</div></div>
-  <div class="stat-pill"><div class="stat-num" id="s-pts">0</div><div class="stat-lbl">Points</div></div>
-  <div class="stat-pill"><div class="stat-num" id="s-players">0</div><div class="stat-lbl">Players</div></div>
-</div>
-
 <div class="progress-wrap">
-  <div class="progress-top"><span>Family Progress</span><span id="pct-lbl">0%</span></div>
+  <div class="progress-top"><span id="states-progress-label">US States: 0 of 50</span><span id="pct-lbl">0%</span></div>
   <div class="progress-bg"><div class="progress-fill" id="prog-fill" style="width:0%"></div></div>
 </div>
 
-<div class="tabs">
-  <button class="tab active" data-tab="plates">All Plates</button>
-  <button class="tab" data-tab="map">Map</button>
-  <button class="tab" data-tab="scores">Scores</button>
-  <button class="tab" data-tab="log">Log</button>
-  <button class="tab" data-tab="players">Players</button>
-</div>
+<nav class="bottom-nav">
+  <button class="tab active" data-tab="plates"><span class="nav-icon">🚗</span>Plates</button>
+  <button class="tab" data-tab="map"><span class="nav-icon">🗺️</span>Map</button>
+  <button class="tab" data-tab="scores"><span class="nav-icon">🏆</span>Scores</button>
+  <button class="tab" data-tab="log"><span class="nav-icon">📋</span>Log</button>
+  <button class="tab" data-tab="players"><span class="nav-icon">👥</span>Players</button>
+</nav>
 
 <div class="content">
 
@@ -492,7 +470,7 @@ canvas#confetti { position: fixed; top: 0; left: 0; width: 100%; height: 100%; p
       <input type="text" id="notes-in" placeholder="e.g. big red semi">
       <div class="spot-btn-row">
         <button class="btn" id="log-btn">Log Sighting 🎯</button>
-        <button class="btn secondary" id="spot-done-btn" style="display:none;">Done</button>
+        <button class="btn secondary" id="spot-done-btn" style="display:none;">Cancel</button>
       </div>
     </div>
   </div>
@@ -759,17 +737,11 @@ function render() {
   const spottedKeys = Object.keys(gameState.spotted);
   if (gameState.deadline) startCountdown(gameState.deadline);
   else document.getElementById('trip-label').textContent = formatGameStart(gameState.startedAt);
-  const spottedCount = spottedKeys.length;
   const usSpottedCount = spottedKeys.filter(k => US_STATES.has(k)).length;
   const pct = Math.round(usSpottedCount/US_STATES_TOTAL*100);
-  document.getElementById('s-spotted').textContent = spottedCount;
-  document.getElementById('s-remain').textContent = US_STATES_TOTAL - usSpottedCount;
+  document.getElementById('states-progress-label').textContent = 'US States: ' + usSpottedCount + ' of 50';
   document.getElementById('pct-lbl').textContent = pct+'%';
   document.getElementById('prog-fill').style.width = pct+'%';
-  const players = Object.values(gameState.players);
-  document.getElementById('s-players').textContent = players.length;
-  const totalPts = players.reduce((a,p)=>a+(p.points||0),0);
-  document.getElementById('s-pts').textContent = totalPts;
   renderPlatesFilter();
   renderMapFilter();
   renderGrid();
@@ -821,6 +793,8 @@ function renderPlatesFilter() {
 }
 
 // ── Plate grid ──
+const BONUS_ABBRS = new Set(['DC','AB','BC','MB','NB','NL','NS','ON','PE','QC','SK','US']);
+
 function renderGrid() {
   const grid = document.getElementById('plates-grid');
   grid.innerHTML = '';
@@ -828,7 +802,19 @@ function renderGrid() {
   const filterPlayer = platesFilter !== '__family__'
     ? players.find(p => p.name === platesFilter) : null;
 
+  let bonusDividerAdded = false;
+
   REGIONS.forEach(r => {
+    // Insert "Bonus Plates" divider before first bonus plate
+    if (!bonusDividerAdded && BONUS_ABBRS.has(r.abbr)) {
+      bonusDividerAdded = true;
+      const divider = document.createElement('div');
+      divider.style.cssText = 'grid-column:1/-1;display:flex;align-items:center;gap:10px;margin:10px 0 4px;';
+      divider.innerHTML = '<span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);">Bonus Plates</span>'
+        + '<div style="flex:1;height:1px;background:var(--border);"></div>';
+      grid.appendChild(divider);
+    }
+
     const cell = document.createElement('div');
     const colors = PLATE_COLORS[r.abbr] || {bg:'#FFFFFF',text:'#003087',border:'#003087'};
 
@@ -842,14 +828,12 @@ function renderGrid() {
     // Disabled: can't earn any more points by tapping
     let disabled = false;
     if (filterPlayer) {
-      disabled = playerSpotted; // player already got this one
+      disabled = playerSpotted;
     } else {
-      // Family view: disable only if every player has it
       if (players.length > 0 && players.every(p => p.spotted && p.spotted[r.abbr])) disabled = true;
     }
 
     if (viewSpotted) {
-      // Already got it — grey/muted
       cell.className = 'plate-cell' + (disabled ? ' disabled-spot' : '');
       cell.style.cssText = 'background:#D6D3CB;border-color:#B8B5AD;opacity:0.45;filter:grayscale(70%);cursor:default;pointer-events:none;';
       cell.innerHTML =
@@ -857,18 +841,18 @@ function renderGrid() {
         '<span class="plate-name" style="color:#9B9890">'+r.name+'</span>' +
         '<div class="check-badge" style="background:#6B6860;color:white">✓</div>';
     } else {
-      // Still needs it — bright and tappable
       cell.className = 'plate-cell';
-      // If family already spotted it but this player hasn't, show a subtle "family has it" ring
       const familyHasIt = familySpotted && filterPlayer && !playerSpotted;
       const borderStyle = familyHasIt
         ? 'border-color:'+colors.border+';box-shadow:0 0 0 2px var(--amber);'
         : 'border-color:'+colors.border+';';
+      // Star: show when no family member has spotted it yet (first-spot bonus still available)
+      const firstSpotAvailable = !familySpotted;
       cell.style.cssText = 'background:'+colors.bg+';'+borderStyle+'opacity:1;font-weight:900;';
       cell.innerHTML =
         '<span class="plate-abbr" style="color:'+colors.text+';font-weight:900">'+r.abbr+'</span>' +
         '<span class="plate-name" style="color:'+colors.text+';opacity:0.85">'+r.name+'</span>' +
-        (familyHasIt ? '<div class="check-badge" style="background:var(--amber);color:white;font-size:7px;">FAM</div>' : '');
+        (firstSpotAvailable ? '<div class="check-badge" style="background:#F5C518;color:#1C1C1A;font-size:9px;width:14px;height:14px;">★</div>' : '');
       if (!disabled) cell.onclick = () => openSpotPanel(r.abbr);
     }
 
@@ -912,12 +896,15 @@ function updateSpotPanel() {
   if (isFirstEver && loggedSpotters.length === 0) {
     banner.className = 'spot-context-banner first-spot';
     banner.textContent = '🎉 New plate! Who spotted it first?';
-  } else if (!isFirstEver) {
-    banner.className = 'spot-context-banner dup-spot';
-    banner.textContent = '⚠️ This plate was already logged — no first-spot bonus, but each player still earns ' + platePoints(abbr) + ' pts!';
-  } else {
+  } else if (isFirstEver && loggedSpotters.length > 0) {
+    const firstName = loggedSpotters[0];
+    const region = REGIONS.find(r=>r.abbr===abbr);
+    const stateName = region ? region.name : abbr;
     banner.className = 'spot-context-banner first-spot';
-    banner.textContent = '➕ Adding another spotter — they earn ' + platePoints(abbr) + ' pts (no first-spot bonus)';
+    banner.textContent = '⭐ ' + firstName + ' gets 2 bonus points for spotting ' + stateName + ' first! Did anyone else see this plate?';
+  } else {
+    banner.className = 'spot-context-banner';
+    banner.style.display = 'none';
   }
 
   // Session header
